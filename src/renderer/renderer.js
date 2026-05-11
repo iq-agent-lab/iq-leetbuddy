@@ -1,4 +1,4 @@
-// renderer.js — vanilla JS. window.api는 preload에서 노출됨.
+// renderer.js — v0.2.4
 
 const $ = (id) => document.getElementById(id);
 
@@ -19,6 +19,17 @@ function showStep(num) {
   $(`step-${num}`).classList.remove('hidden');
 }
 
+function formatShortcutForDisplay(sc) {
+  if (!sc) return '';
+  return sc
+    .replace('CmdOrCtrl', '⌘')
+    .replace('Cmd', '⌘')
+    .replace('Ctrl', '⌃')
+    .replace('Alt', '⌥')
+    .replace('Shift', '⇧')
+    .replace(/\+/g, '');
+}
+
 async function checkConfig() {
   try {
     const cfg = await window.api.checkConfig();
@@ -26,19 +37,31 @@ async function checkConfig() {
     if (cfg.anthropic && cfg.github) {
       el.textContent = `→ ${cfg.owner}/${cfg.repo}`;
       el.classList.add('ok');
+      el.classList.remove('warning');
     } else {
       const missing = [];
       if (!cfg.anthropic) missing.push('Anthropic');
       if (!cfg.github) missing.push('GitHub');
-      el.textContent = `.env 누락: ${missing.join(', ')}`;
+      el.textContent = `설정 필요: ${missing.join(', ')} (⚙️ 클릭)`;
       el.classList.add('warning');
+      el.classList.remove('ok');
+    }
+    // 단축키 표시
+    const scEl = $('shortcut-status');
+    if (cfg.shortcut) {
+      const display = formatShortcutForDisplay(cfg.shortcut);
+      scEl.textContent = `${display} 으로 어디서든 호출`;
+      // step 2 hint도 함께 갱신
+      const hint = $('step-2-hint');
+      hint.innerHTML = `읽고 LeetCode에서 풀어. 풀고 나면 <kbd>${display}</kbd>로 돌아와.`;
+    } else {
+      scEl.textContent = '단축키 등록 실패';
     }
   } catch (e) {
     $('config-status').textContent = '설정 확인 실패';
   }
 }
 
-// 언어 선택 셋업 — codeSnippets 기반으로 옵션 동적 생성
 function populateLanguageSelect(snippets) {
   const select = $('starter-lang-select');
   select.innerHTML = '';
@@ -48,7 +71,6 @@ function populateLanguageSelect(snippets) {
     return;
   }
 
-  // 자주 쓰이는 언어를 위로 정렬 (사용자 메모리 반영 가능)
   const PREFERRED_ORDER = ['java', 'python3', 'cpp', 'javascript', 'typescript', 'go', 'kotlin', 'rust'];
   const sorted = [...snippets].sort((a, b) => {
     const ai = PREFERRED_ORDER.indexOf(a.langSlug);
@@ -66,7 +88,6 @@ function populateLanguageSelect(snippets) {
     select.appendChild(opt);
   });
 
-  // 기본 선택: Java (있으면), 없으면 첫 번째
   const defaultSlug = sorted.find((s) => s.langSlug === 'java')?.langSlug || sorted[0].langSlug;
   select.value = defaultSlug;
   state.selectedLang = defaultSlug;
@@ -99,9 +120,7 @@ async function handleFetch() {
     state.problem = result.problem;
     state.translation = result.translation;
 
-    // 마크다운을 HTML로 렌더링한 결과를 그대로 삽입
     $('translation-output').innerHTML = result.translationHtml;
-
     populateLanguageSelect(result.problem.codeSnippets);
 
     showStep(2);
@@ -174,7 +193,47 @@ function reset() {
   $('problem-input').focus();
 }
 
-// listeners
+// ─── 설정 모달 ───
+async function openSettings() {
+  const settings = await window.api.getSettings();
+  $('setting-anthropic-key').value = settings.ANTHROPIC_API_KEY || '';
+  $('setting-anthropic-model').value = settings.ANTHROPIC_MODEL || '';
+  $('setting-github-token').value = settings.GITHUB_TOKEN || '';
+  $('setting-github-owner').value = settings.GITHUB_OWNER || '';
+  $('setting-github-repo').value = settings.GITHUB_REPO || '';
+  $('setting-github-branch').value = settings.GITHUB_BRANCH || '';
+  $('settings-modal').classList.remove('hidden');
+}
+
+function closeSettings() {
+  $('settings-modal').classList.add('hidden');
+}
+
+async function saveSettings() {
+  const payload = {
+    ANTHROPIC_API_KEY: $('setting-anthropic-key').value,
+    ANTHROPIC_MODEL: $('setting-anthropic-model').value,
+    GITHUB_TOKEN: $('setting-github-token').value,
+    GITHUB_OWNER: $('setting-github-owner').value,
+    GITHUB_REPO: $('setting-github-repo').value,
+    GITHUB_BRANCH: $('setting-github-branch').value,
+  };
+
+  $('save-settings').disabled = true;
+  try {
+    const result = await window.api.saveSettings(payload);
+    if (!result.ok) throw new Error(result.error);
+    setStatus('설정 저장됨', 'ok');
+    closeSettings();
+    checkConfig();
+  } catch (e) {
+    setStatus(`저장 실패: ${e.message}`, 'error');
+  } finally {
+    $('save-settings').disabled = false;
+  }
+}
+
+// ─── listeners ───
 $('fetch-btn').addEventListener('click', handleFetch);
 $('upload-btn').addEventListener('click', handleUpload);
 $('problem-input').addEventListener('keypress', (e) => {
@@ -184,16 +243,26 @@ $('starter-lang-select').addEventListener('change', (e) => {
   state.selectedLang = e.target.value;
   updateStarterCode();
 });
+$('open-leetcode-btn').addEventListener('click', () => window.api.openLeetCode());
+$('open-settings-btn').addEventListener('click', openSettings);
+$('close-settings').addEventListener('click', closeSettings);
+$('cancel-settings').addEventListener('click', closeSettings);
+$('save-settings').addEventListener('click', saveSettings);
 
-// Cmd+K / Ctrl+K 으로 초기화
+$('settings-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'settings-modal') closeSettings();
+});
+
 document.addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
     e.preventDefault();
     reset();
   }
+  if (e.key === 'Escape' && !$('settings-modal').classList.contains('hidden')) {
+    closeSettings();
+  }
 });
 
-// 초기화
 window.addEventListener('DOMContentLoaded', () => {
   checkConfig();
   $('problem-input').focus();

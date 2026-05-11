@@ -16,6 +16,10 @@ function octokit(): Octokit {
   return _octokit;
 }
 
+export function resetGithubClient() {
+  _octokit = null;
+}
+
 interface CommitFile {
   path: string;
   content: string;

@@ -1,24 +1,88 @@
-// Electron 메인 프로세스: 윈도우 + 트레이 + 생명주기 관리
-// 트레이 아이콘에 상주, 클릭으로 토글
+// Electron 메인 프로세스
+// v0.2.4: embedded LeetCode 윈도우, 영속 세션, 링크 인터셉트, 강건한 단축키
 
-import { app, BrowserWindow, Tray, Menu, nativeImage, screen, globalShortcut } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  Tray,
+  Menu,
+  nativeImage,
+  screen,
+  globalShortcut,
+  shell,
+  session,
+} from 'electron';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-import { registerIpcHandlers } from './ipc';
+import { registerIpcHandlers, setLeetCodeOpener, setShortcutGetter } from './ipc';
 
-// .env 로드 (앱 root 기준)
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 let mainWindow: BrowserWindow | null = null;
+let leetcodeWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
+let activeShortcut: string | null = null;
 
+// LeetCode URL 판별
+function isLeetCodeUrl(url: string): boolean {
+  return /^https?:\/\/(?:www\.)?leetcode\.(?:com|cn)/i.test(url);
+}
+
+// 외부/embedded 라우팅
+function routeUrl(url: string) {
+  if (isLeetCodeUrl(url)) {
+    openLeetCodeWindow(url);
+  } else if (url.startsWith('http://') || url.startsWith('https://')) {
+    shell.openExternal(url);
+  }
+}
+
+// ─── LeetCode embedded 윈도우 ──────────────────────────────
+function openLeetCodeWindow(url: string = 'https://leetcode.com/') {
+  if (leetcodeWindow && !leetcodeWindow.isDestroyed()) {
+    leetcodeWindow.loadURL(url);
+    leetcodeWindow.show();
+    leetcodeWindow.focus();
+    if (process.platform === 'darwin') app.focus({ steal: true });
+    return;
+  }
+
+  // 영속 세션 - 한 번 로그인하면 다음 실행까지 유지
+  const lcSession = session.fromPartition('persist:leetcode');
+
+  const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
+  leetcodeWindow = new BrowserWindow({
+    width: Math.min(1400, Math.floor(sw * 0.7)),
+    height: Math.min(1100, Math.floor(sh * 0.92)),
+    title: 'LeetCode',
+    backgroundColor: '#1a1a1a',
+    webPreferences: {
+      session: lcSession,
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  leetcodeWindow.loadURL(url);
+
+  leetcodeWindow.on('closed', () => {
+    leetcodeWindow = null;
+  });
+
+  // LeetCode 안의 외부 링크는 외부 브라우저로
+  leetcodeWindow.webContents.setWindowOpenHandler(({ url: openUrl }) => {
+    if (isLeetCodeUrl(openUrl)) {
+      leetcodeWindow?.loadURL(openUrl);
+    } else {
+      shell.openExternal(openUrl);
+    }
+    return { action: 'deny' };
+  });
+}
+
+// ─── 메인 윈도우 ──────────────────────────────
 function createWindow() {
-  // 화면 크기에 비례한 동적 디폴트
-  // - 너비: 화면의 55% (단, 1100 상한)
-  // - 높이: 화면의 92% (단, 1100 상한)
-  // 30인치급 모니터: LeetCode 옆에 띄우기 좋은 폭
-  // 14인치 맥북: 자연스럽게 작아짐
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
   const winWidth = Math.min(1100, Math.max(840, Math.floor(sw * 0.55)));
   const winHeight = Math.min(1100, Math.max(800, Math.floor(sh * 0.92)));
@@ -42,7 +106,19 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
 
-  // 창 닫기를 트레이로 숨기는 것으로 변경 (Cmd+Q 또는 메뉴에서 종료해야 진짜 종료)
+  // 메인 윈도우 안에서 우리 file:// 외 navigation은 모두 차단하고 라우팅
+  // 이게 핵심: 원문 링크 클릭해도 leetbuddy UI가 안 사라짐
+  mainWindow.webContents.on('will-navigate', (event, navUrl) => {
+    if (navUrl.startsWith('file://')) return;
+    event.preventDefault();
+    routeUrl(navUrl);
+  });
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    routeUrl(url);
+    return { action: 'deny' };
+  });
+
   mainWindow.on('close', (e) => {
     if (!isQuitting) {
       e.preventDefault();
@@ -54,13 +130,12 @@ function createWindow() {
     mainWindow = null;
   });
 
-  // 개발 모드일 때 devtools 자동 열기
   if (process.argv.includes('--dev')) {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 }
 
-// 강제 활성화 - 다른 앱에서 단축키로 호출될 때 / 트레이 메뉴에서 호출될 때
+// ─── 강제 활성화 (단축키, 트레이 클릭에서 사용) ──────────────────────────────
 function showAndFocus() {
   if (!mainWindow) {
     createWindow();
@@ -68,20 +143,28 @@ function showAndFocus() {
     win?.once('ready-to-show', () => {
       win?.show();
       win?.focus();
-      if (process.platform === 'darwin') app.focus({ steal: true });
     });
     return;
   }
+
   if (!mainWindow.isVisible()) mainWindow.show();
+
+  // macOS에서 background app이 강제로 앞으로 나오는 트릭:
+  // 1) alwaysOnTop true (잠깐 최상위로)
+  // 2) focus + moveTop
+  // 3) alwaysOnTop false (붙박이 해제)
+  mainWindow.setAlwaysOnTop(true);
   mainWindow.focus();
-  if (process.platform === 'darwin') app.focus({ steal: true });
+  if (process.platform === 'darwin') {
+    app.focus({ steal: true });
+  }
+  mainWindow.moveTop();
+  mainWindow.setAlwaysOnTop(false);
 }
 
 function toggleWindow() {
   if (!mainWindow) {
     createWindow();
-    const win = mainWindow as BrowserWindow | null;
-    win?.once('ready-to-show', () => win?.show());
     return;
   }
   if (mainWindow.isVisible() && mainWindow.isFocused()) {
@@ -91,21 +174,52 @@ function toggleWindow() {
   }
 }
 
+// ─── 단축키 등록 (fallback chain) ──────────────────────────────
+function registerShortcuts() {
+  // 충돌 가능성 낮은 순으로 시도
+  const candidates = [
+    'CmdOrCtrl+Alt+L',   // 1순위: Cmd+Option+L
+    'CmdOrCtrl+Alt+B',   // 2순위: B for Buddy
+    'CmdOrCtrl+Alt+J',   // 3순위
+    'CmdOrCtrl+Shift+L', // 4순위 (Safari Reading List와 충돌)
+  ];
+
+  for (const sc of candidates) {
+    try {
+      const ok = globalShortcut.register(sc, showAndFocus);
+      if (ok && globalShortcut.isRegistered(sc)) {
+        activeShortcut = sc;
+        console.log(`[shortcut] registered: ${sc}`);
+        return;
+      }
+    } catch (e) {
+      console.warn(`[shortcut] ${sc} 시도 실패:`, e);
+    }
+  }
+  console.warn('[shortcut] 모든 단축키 등록 실패');
+}
+
+// ─── 트레이 ──────────────────────────────
 function createTray() {
   const iconPath = path.join(__dirname, '../assets/tray-icon.png');
   let image = nativeImage.createFromPath(iconPath);
   if (!image.isEmpty()) {
     image = image.resize({ width: 18, height: 18 });
-    // macOS 메뉴바에서 light/dark 모두 잘 보이게
     image.setTemplateImage(false);
   }
   tray = new Tray(image);
 
+  const accelLabel = activeShortcut || '';
+
   const menu = Menu.buildFromTemplate([
     {
       label: 'iq-leetbuddy 보이기',
-      accelerator: 'CmdOrCtrl+Shift+L',
+      accelerator: activeShortcut || undefined,
       click: showAndFocus,
+    },
+    {
+      label: 'LeetCode 열기 (로그인)',
+      click: () => openLeetCodeWindow(),
     },
     { type: 'separator' },
     {
@@ -118,12 +232,12 @@ function createTray() {
     },
   ]);
 
-  tray.setToolTip('iq-leetbuddy (⌘⇧L로 어디서든 호출)');
+  tray.setToolTip(`iq-leetbuddy${accelLabel ? ` (${accelLabel})` : ''}`);
   tray.setContextMenu(menu);
   tray.on('click', toggleWindow);
 }
 
-// macOS 표준 메뉴바 - 복붙 단축키 정상화 + leetbuddy 호출 메뉴 노출
+// ─── 표준 메뉴바 ──────────────────────────────
 function createAppMenu() {
   const isMac = process.platform === 'darwin';
   const menu = Menu.buildFromTemplate([
@@ -158,8 +272,12 @@ function createAppMenu() {
       submenu: [
         {
           label: 'leetbuddy 보이기/포커스',
-          accelerator: 'CmdOrCtrl+Shift+L',
+          accelerator: activeShortcut || undefined,
           click: showAndFocus,
+        },
+        {
+          label: 'LeetCode 열기',
+          click: () => openLeetCodeWindow(),
         },
         { type: 'separator' as const },
         { role: 'reload' as const },
@@ -172,26 +290,25 @@ function createAppMenu() {
     },
     {
       label: 'Window',
-      submenu: [
-        { role: 'minimize' as const },
-        { role: 'close' as const },
-      ],
+      submenu: [{ role: 'minimize' as const }, { role: 'close' as const }],
     },
   ]);
   Menu.setApplicationMenu(menu);
 }
 
+// ─── 부트스트랩 ──────────────────────────────
 app.whenReady().then(() => {
+  registerShortcuts(); // 트레이/메뉴 빌드 전에 단축키 등록
+
+  // IPC에 의존성 주입
+  setLeetCodeOpener(openLeetCodeWindow);
+  setShortcutGetter(() => activeShortcut);
+
   createAppMenu();
   createWindow();
   createTray();
   registerIpcHandlers();
 
-  // 글로벌 단축키: 어떤 앱에 있든 ⌘⇧L로 leetbuddy 활성화
-  const ok = globalShortcut.register('CmdOrCtrl+Shift+L', showAndFocus);
-  if (!ok) console.warn('Global shortcut Cmd+Shift+L 등록 실패 (이미 다른 앱이 점유)');
-
-  // 보여줄 준비 됐을 때 show (깜빡임 방지)
   mainWindow?.once('ready-to-show', () => {
     mainWindow?.show();
   });
@@ -202,10 +319,9 @@ app.whenReady().then(() => {
   });
 });
 
-// macOS에서는 모든 창이 닫혀도 앱 유지 (트레이 상주)
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    // Windows/Linux는 트레이만 남기고 윈도우 없는 상태 OK
+    // 트레이 상주
   }
 });
 

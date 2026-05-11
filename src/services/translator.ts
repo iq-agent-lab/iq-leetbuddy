@@ -15,6 +15,10 @@ function client(): Anthropic {
   return _client;
 }
 
+export function resetTranslatorClient() {
+  _client = null;
+}
+
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 
 function buildPrompt(problem: LeetCodeProblem): string {
