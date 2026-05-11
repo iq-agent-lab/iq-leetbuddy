@@ -37,9 +37,7 @@ ${problem.exampleTestcases}
 
 # ${problem.questionFrontendId}. ${problem.title}
 
-> **난이도**: ${problem.difficulty}
-> **태그**: ${tags}
-> **원문**: https://leetcode.com/problems/${problem.titleSlug}/
+> **${problem.difficulty}** · ${tags} · [원문](https://leetcode.com/problems/${problem.titleSlug}/)
 
 ## 문제
 
@@ -67,7 +65,8 @@ Output: ...
 2. 수식은 \`$...$\` 또는 코드 백틱 사용
 3. 영어 원문의 뉘앙스를 살리되 자연스러운 한국어 문장
 4. 어색한 직역 금지 (예: "당신은 주어집니다" 같은 표현 X)
-5. 마크다운 외 다른 설명/주석 추가 금지`;
+5. **이미지는 반드시 보존**: 원문 HTML에 \`<img src="...">\`가 있으면 마크다운 \`![설명](원본URL)\` 형식으로 변환. URL은 절대 변경/단축하지 말 것. alt 텍스트는 한국어로 짧게 (예: "예시 1 다이어그램")
+6. 마크다운 외 다른 설명/주석 추가 금지`;
 }
 
 export async function translateProblem(problem: LeetCodeProblem): Promise<string> {
