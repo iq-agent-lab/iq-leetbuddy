@@ -49,10 +49,22 @@ export async function withRetry<T>(
   throw lastError;
 }
 
-// LeetCode 입력 파싱: URL, slug, 둘 다 지원
+// LeetCode 입력 파싱: URL (모든 형태), slug, 문제 이름까지 지원
+// 지원하는 입력 예시:
+//   - https://leetcode.com/problems/two-sum/
+//   - https://leetcode.com/problems/two-sum/description/
+//   - https://leetcode.com/problems/regular-expression-matching/description/?envType=...
+//   - leetcode.com/problems/two-sum
+//   - two-sum
+//   - Two Sum            (공백 → dash 변환)
 export function parseProblemInput(input: string): string {
   const trimmed = input.trim();
-  const urlMatch = trimmed.match(/leetcode\.com\/problems\/([^\/?#]+)/);
-  if (urlMatch) return urlMatch[1];
-  return trimmed.toLowerCase().replace(/\s+/g, '-');
+
+  // URL 패턴 매칭 - leetcode.com 또는 leetcode.cn, http(s) 선택, www 선택
+  const urlPattern = /leetcode\.(?:com|cn)\/problems\/([a-zA-Z0-9-]+)/i;
+  const urlMatch = trimmed.match(urlPattern);
+  if (urlMatch) return urlMatch[1].toLowerCase();
+
+  // 이미 slug 형태이거나 자유 텍스트
+  return trimmed.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '');
 }

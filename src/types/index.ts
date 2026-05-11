@@ -5,6 +5,12 @@ export interface LeetCodeTag {
   slug: string;
 }
 
+export interface CodeSnippet {
+  lang: string;        // 표시명 (e.g., "Python3", "Java")
+  langSlug: string;    // 슬러그 (e.g., "python3", "java")
+  code: string;        // 시작 코드 템플릿
+}
+
 export interface LeetCodeProblem {
   questionFrontendId: string;
   title: string;
@@ -13,13 +19,14 @@ export interface LeetCodeProblem {
   difficulty: 'Easy' | 'Medium' | 'Hard';
   exampleTestcases: string;
   topicTags: LeetCodeTag[];
+  codeSnippets: CodeSnippet[];
 }
 
 export interface UploadPayload {
   problem: LeetCodeProblem;
   translation: string;
   code: string;
-  language: string; // langSlug (e.g., "python3", "java")
+  language: string;
 }
 
 export interface UploadResult {
@@ -30,7 +37,8 @@ export interface UploadResult {
 
 export interface FetchProblemResult {
   problem: LeetCodeProblem;
-  translation: string;
+  translation: string;       // 원본 마크다운 (GitHub 업로드용)
+  translationHtml: string;   // 렌더링된 HTML (UI 표시용)
 }
 
 export interface IpcError {

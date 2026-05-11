@@ -15,6 +15,7 @@ query questionData($titleSlug: String!) {
     difficulty
     exampleTestcases
     topicTags { name slug }
+    codeSnippets { lang langSlug code }
   }
 }
 `;
