@@ -4,7 +4,7 @@ import { ipcMain } from 'electron';
 import { fetchAndTranslate, annotateAndUpload } from '../services/pipeline';
 import { resetTranslatorClient } from '../services/translator';
 import { resetAnnotatorClient } from '../services/annotator';
-import { resetGithubClient } from '../services/github';
+import { resetGithubClient, createRepoIfMissing } from '../services/github';
 import { getMaskedSettings, saveSettings, AppSettings } from './settings';
 
 let leetcodeOpener: ((url?: string) => void) | null = null;
@@ -23,6 +23,11 @@ function toErrorMessage(err: unknown): string {
   return String(err);
 }
 
+function getStatus(err: unknown): number | null {
+  const e = err as { status?: number };
+  return typeof e?.status === 'number' ? e.status : null;
+}
+
 export function registerIpcHandlers() {
   ipcMain.handle('fetch-problem', async (event, input: string) => {
     const send = (stage: string) => event.sender.send('fetch-progress', stage);
@@ -30,7 +35,7 @@ export function registerIpcHandlers() {
       const result = await fetchAndTranslate(input, send);
       return { ok: true, ...result };
     } catch (err) {
-      return { ok: false, error: toErrorMessage(err) };
+      return { ok: false, error: toErrorMessage(err), status: getStatus(err) };
     }
   });
 
@@ -40,7 +45,16 @@ export function registerIpcHandlers() {
       const result = await annotateAndUpload(payload, send);
       return { ok: true, ...result };
     } catch (err) {
-      return { ok: false, error: toErrorMessage(err) };
+      return { ok: false, error: toErrorMessage(err), status: getStatus(err) };
+    }
+  });
+
+  ipcMain.handle('create-repo', async () => {
+    try {
+      const result = await createRepoIfMissing();
+      return { ok: true, ...result };
+    } catch (err) {
+      return { ok: false, error: toErrorMessage(err), status: getStatus(err) };
     }
   });
 

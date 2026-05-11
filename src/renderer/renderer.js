@@ -28,6 +28,7 @@ const state = {
   problem: null,
   translation: '',
   selectedLang: null,
+  lastUploadPayload: null,
 };
 
 function setStatus(text, kind) {
@@ -156,6 +157,95 @@ async function handleFetch() {
   }
 }
 
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function showUploadSuccess(result) {
+  const out = $('result-output');
+  out.classList.remove('error');
+  out.innerHTML = `
+    <strong>✓ 업로드 완료</strong>
+    <div class="result-row"><span class="result-label">폴더</span><code class="inline-mono">${result.folder}</code></div>
+    <div class="result-row"><span class="result-label">커밋</span><a href="${result.commitUrl}" target="_blank" rel="noopener">${result.commitSha.slice(0, 7)}</a></div>
+  `;
+  showStep(4);
+  setStatus('완료 · 다음 문제 가져오기 가능', 'ok');
+}
+
+function showRepoMissingError(message) {
+  const out = $('result-output');
+  out.classList.add('error');
+  out.innerHTML = `
+    <strong>✗ 업로드 실패 — 레포가 없는 것 같아</strong>
+    <pre class="error-detail">${escapeHtml(message)}</pre>
+    <div class="action-row">
+      <button class="primary" id="create-repo-btn">
+        <span class="btn-content">이 이름으로 새 레포 만들기 (public, README 자동 생성)</span>
+      </button>
+      <button class="secondary" id="open-settings-from-error-btn">
+        <span class="btn-content">설정 열기</span>
+      </button>
+    </div>
+  `;
+  $('create-repo-btn').addEventListener('click', handleCreateRepo);
+  $('open-settings-from-error-btn').addEventListener('click', openSettings);
+  showStep(4);
+  setStatus('레포 없음 · 자동 생성 가능', 'error');
+}
+
+function showErrorPlain(message) {
+  const out = $('result-output');
+  out.classList.add('error');
+  out.innerHTML = `<strong>✗ 업로드 실패</strong><pre class="error-detail">${escapeHtml(message)}</pre>`;
+  showStep(4);
+  setStatus('업로드 실패 · 메시지 확인', 'error');
+}
+
+async function performUpload() {
+  setStatus('AI 회고 작성 중...', 'busy');
+  setButtonLoading('upload-btn', 'AI 회고 작성 중...');
+
+  try {
+    const result = await window.api.uploadSolution(state.lastUploadPayload);
+    if (!result.ok) {
+      const err = new Error(result.error);
+      err.status = result.status;
+      throw err;
+    }
+    showUploadSuccess(result);
+  } catch (e) {
+    if (e.status === 404) {
+      showRepoMissingError(e.message);
+    } else {
+      showErrorPlain(e.message);
+    }
+  } finally {
+    resetButton('upload-btn', 'AI 회고 생성 후 GitHub에 업로드');
+  }
+}
+
+async function handleCreateRepo() {
+  const btn = $('create-repo-btn');
+  btn.disabled = true;
+  btn.querySelector('.btn-content').innerHTML = `<span class="spinner"></span>레포 생성 중...`;
+  setStatus('GitHub에 새 레포 만드는 중...', 'busy');
+
+  try {
+    const result = await window.api.createRepo();
+    if (!result.ok) throw new Error(result.error);
+
+    // 새 레포 만들어졌으니 잠깐 대기 후 자동으로 업로드 재시도
+    // (auto_init된 README가 main 브랜치로 commit되기까지 약간의 propagation 시간 필요)
+    setStatus(`레포 생성 완료 (${result.scope}) · 1.5초 후 업로드 재시도`, 'busy');
+    await new Promise((r) => setTimeout(r, 1500));
+
+    await performUpload();
+  } catch (e) {
+    showErrorPlain(`레포 생성 실패: ${e.message}`);
+  }
+}
+
 async function handleUpload() {
   if (!state.problem) return;
 
@@ -167,43 +257,15 @@ async function handleUpload() {
     return;
   }
 
-  setStatus('AI 회고 작성 중...', 'busy');
-  setButtonLoading('upload-btn', 'AI 회고 작성 중...');
+  // 재시도용으로 페이로드 보관
+  state.lastUploadPayload = {
+    problem: state.problem,
+    translation: state.translation,
+    code,
+    language,
+  };
 
-  try {
-    const result = await window.api.uploadSolution({
-      problem: state.problem,
-      translation: state.translation,
-      code,
-      language,
-    });
-
-    if (!result.ok) throw new Error(result.error);
-
-    const out = $('result-output');
-    out.classList.remove('error');
-    out.innerHTML = `
-      <strong>✓ 업로드 완료</strong>
-      <div class="result-row"><span class="result-label">폴더</span><code class="inline-mono">${result.folder}</code></div>
-      <div class="result-row"><span class="result-label">커밋</span><a href="${result.commitUrl}" target="_blank" rel="noopener">${result.commitSha.slice(0, 7)}</a></div>
-    `;
-    showStep(4);
-
-    setStatus('완료 · 다음 문제 가져오기 가능', 'ok');
-  } catch (e) {
-    const out = $('result-output');
-    out.classList.add('error');
-    // 줄바꿈을 보존하면서 HTML 안전하게 표시
-    const escaped = e.message
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-    out.innerHTML = `<strong>✗ 업로드 실패</strong><pre class="error-detail">${escaped}</pre>`;
-    showStep(4);
-    setStatus('업로드 실패 · 메시지 확인', 'error');
-  } finally {
-    resetButton('upload-btn', 'AI 회고 생성 후 GitHub에 업로드');
-  }
+  await performUpload();
 }
 
 function reset() {
