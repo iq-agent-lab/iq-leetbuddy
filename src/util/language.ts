@@ -27,6 +27,35 @@ export function langToExt(langSlug: string): string {
   return LANGUAGE_EXTENSIONS[langSlug.toLowerCase()] ?? 'txt';
 }
 
+// LeetCode 언어 slug를 디렉토리명으로 매핑
+// 같은 문제를 여러 언어로 풀 때 풀이/회고를 언어별 하위 폴더로 분리하기 위함
+const LANGUAGE_FOLDERS: Record<string, string> = {
+  python: 'python',
+  python3: 'python',
+  java: 'java',
+  javascript: 'javascript',
+  typescript: 'typescript',
+  cpp: 'cpp',
+  c: 'c',
+  csharp: 'csharp',
+  'c#': 'csharp',
+  go: 'go',
+  golang: 'go',
+  rust: 'rust',
+  kotlin: 'kotlin',
+  swift: 'swift',
+  ruby: 'ruby',
+  scala: 'scala',
+  php: 'php',
+  dart: 'dart',
+  elixir: 'elixir',
+  erlang: 'erlang',
+};
+
+export function langToFolder(langSlug: string): string {
+  return LANGUAGE_FOLDERS[langSlug.toLowerCase()] ?? langSlug.toLowerCase();
+}
+
 // retry helper - iq-blogger 패턴 차용
 export async function withRetry<T>(
   fn: () => Promise<T>,

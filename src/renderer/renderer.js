@@ -360,6 +360,23 @@ function setSectionStatus(elementId, hasValue) {
   }
 }
 
+// GitHub은 token + owner + repo 세 가지 모두 필요해서 3단계 상태
+function setGitHubStatus(settings) {
+  const el = $('github-status');
+  const hasOwnerRepo = settings.GITHUB_OWNER && settings.GITHUB_REPO;
+  if (settings.hasGithubToken && hasOwnerRepo) {
+    el.textContent = '✓ 저장됨';
+    el.dataset.state = 'saved';
+  } else if (settings.hasGithubToken) {
+    // 토큰은 있는데 owner/repo가 비어있는 흔한 케이스
+    el.textContent = '⚠ Owner/Repo 입력 필요';
+    el.dataset.state = 'partial';
+  } else {
+    el.textContent = '⚠ 토큰 필요';
+    el.dataset.state = 'empty';
+  }
+}
+
 async function openSettings() {
   const settings = await window.api.getSettings();
   $('setting-anthropic-key').value = ''; // 시크릿은 항상 비움
@@ -372,10 +389,7 @@ async function openSettings() {
 
   // 저장 상태 시각적 표시
   setSectionStatus('anthropic-status', settings.hasAnthropicKey);
-  // GitHub은 token + owner + repo 셋 다 있어야 "완전 설정"
-  const githubComplete =
-    settings.hasGithubToken && settings.GITHUB_OWNER && settings.GITHUB_REPO;
-  setSectionStatus('github-status', githubComplete);
+  setGitHubStatus(settings);
 
   // 토큰 입력란 placeholder를 상태 반영
   $('setting-anthropic-key').placeholder = settings.hasAnthropicKey

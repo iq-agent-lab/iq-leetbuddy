@@ -1144,6 +1144,12 @@ pre code.hljs {
   border: 1px solid rgba(138, 184, 122, 0.3);
 }
 
+.section-status[data-state="partial"] {
+  background: rgba(220, 175, 100, 0.08);
+  color: #dcaf64;
+  border: 1px solid rgba(220, 175, 100, 0.3);
+}
+
 .section-status[data-state="empty"] {
   background: rgba(204, 120, 92, 0.1);
   color: var(--accent-soft);

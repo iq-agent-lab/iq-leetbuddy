@@ -3,7 +3,7 @@
 
 import { Octokit } from '@octokit/rest';
 import { LeetCodeProblem, UploadResult } from '../types';
-import { langToExt } from '../util/language';
+import { langToExt, langToFolder } from '../util/language';
 
 // GitHub API 에러를 진단 가능한 한국어 메시지로 변환 (원본 status는 보존)
 function toGitHubError(
@@ -175,30 +175,34 @@ export async function uploadSolution(args: {
   }
 
   const num = String(args.problem.questionFrontendId).padStart(4, '0');
-  const folder = `${num}-${args.problem.titleSlug}`;
+  const baseFolder = `${num}-${args.problem.titleSlug}`;
   const ext = langToExt(args.language);
+  const langDir = langToFolder(args.language);
 
   const files: CommitFile[] = [
     {
-      path: `${folder}/README.md`,
+      // 한국어 번역: 모든 언어 풀이가 공유 (root에 위치, 매번 갱신되지만 내용 동일)
+      path: `${baseFolder}/README.md`,
       content: args.translation,
     },
     {
-      path: `${folder}/solution.${ext}`,
+      // 통과 코드: 언어별 하위 폴더
+      path: `${baseFolder}/${langDir}/solution.${ext}`,
       content: args.code.endsWith('\n') ? args.code : args.code + '\n',
     },
     {
-      path: `${folder}/RETROSPECTIVE.md`,
+      // AI 회고: 언어별 하위 폴더 (언어마다 다른 코드 → 다른 회고)
+      path: `${baseFolder}/${langDir}/RETROSPECTIVE.md`,
       content: args.annotated,
     },
   ];
 
-  const message = `feat: ${args.problem.questionFrontendId}. ${args.problem.title} 풀이 추가`;
+  const message = `feat: ${args.problem.questionFrontendId}. ${args.problem.title} (${langDir}) 풀이 추가`;
 
   const result = await commitFiles(owner, repo, branch, files, message);
 
   return {
-    folder,
+    folder: `${baseFolder}/${langDir}`,
     commitSha: result.sha,
     commitUrl: result.url,
   };

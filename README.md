@@ -171,23 +171,31 @@ macOS의 *focus steal 제약*을 우회하기 위해 `setAlwaysOnTop(true) → f
 ```
 {owner}/{repo}/
 ├── 0001-two-sum/
-│   ├── README.md             ← 한국어 번역 (이미지 보존)
-│   ├── solution.java         ← 통과 코드 원본
-│   └── RETROSPECTIVE.md      ← AI 회고
+│   ├── README.md             ← 한국어 번역 (공통, 모든 언어 풀이가 공유)
+│   ├── python/
+│   │   ├── solution.py
+│   │   └── RETROSPECTIVE.md  ← Python 풀이 회고
+│   └── java/
+│       ├── solution.java
+│       └── RETROSPECTIVE.md  ← Java 풀이 회고
 │
 ├── 0094-binary-tree-inorder-traversal/
 │   ├── README.md
-│   ├── solution.cpp
-│   └── RETROSPECTIVE.md
+│   └── cpp/
+│       ├── solution.cpp
+│       └── RETROSPECTIVE.md
 │
 └── 0101-symmetric-tree/
     ├── README.md
-    ├── solution.java
-    └── RETROSPECTIVE.md
+    └── java/
+        ├── solution.java
+        └── RETROSPECTIVE.md
 ```
 
 - 폴더명 `{4자리 번호}-{titleSlug}` → GitHub 파일 브라우저에서 자연 정렬
-- 한 문제당 단일 commit: `feat: {번호}. {제목} 풀이 추가`
+- **언어별 하위 폴더**로 풀이/회고 분리 → 같은 문제를 여러 언어로 풀어도 회고가 덮어써지지 않음
+- 한국어 번역 README는 공통 (매번 동일 내용으로 갱신)
+- 한 문제+언어당 단일 commit: `feat: {번호}. {제목} ({언어}) 풀이 추가`
 
 ---
 
