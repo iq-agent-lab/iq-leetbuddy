@@ -1,6 +1,6 @@
 {
   "name": "iq-leetbuddy",
-  "version": "0.3.2",
+  "version": "0.3.4",
   "description": "LeetCode 풀이를 한국어로 번역하고 AI 회고를 생성해 GitHub에 자동 업로드하는 데스크톱 에이전트",
   "main": "dist/main/index.js",
   "scripts": {
@@ -14,7 +14,8 @@
     "dist:mac-universal": "npm run build && electron-builder --mac --arm64 --x64",
     "dist:win": "npm run build && electron-builder --win",
     "dist:linux": "npm run build && electron-builder --linux",
-    "pack": "npm run build && electron-builder --dir"
+    "pack": "npm run build && electron-builder --dir",
+    "release": "npm version patch && git push --follow-tags && echo '✓ Actions 빌드 시작'"
   },
   "keywords": [
     "leetcode",
@@ -100,7 +101,6 @@
       "shortcutName": "iq-leetbuddy",
       "artifactName": "${productName}-${version}-windows-x64.${ext}"
     },
-
     "linux": {
       "target": [
         "AppImage"
