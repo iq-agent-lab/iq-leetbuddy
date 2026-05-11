@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- iq-leetbuddy가 필요로 하는 권한 명세 -->
+  <!-- 외부 네트워크 클라이언트 (LeetCode GraphQL, Anthropic API, GitHub API) -->
+  <key>com.apple.security.network.client</key>
+  <true/>
+
+  <!-- 외부 서버 receive (현재 사용 X, 향후 mobile companion 대비) -->
+  <key>com.apple.security.network.server</key>
+  <false/>
+
+  <!-- 사용자 .env 읽기/쓰기 위해 -->
+  <key>com.apple.security.files.user-selected.read-write</key>
+  <true/>
+
+  <!-- JIT - Electron이 V8 엔진에서 사용 -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+
+  <!-- unsigned 코드 실행 - electron 자체 처리에 필요 -->
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+
+  <!-- 환경변수 상속 -->
+  <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+  <true/>
+</dict>
+</plist>

@@ -3,8 +3,17 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { app } from 'electron';
 
 function envPath(): string {
+  // 패키지된 앱: userData 디렉토리에 저장 (asar는 read-only이므로)
+  //   macOS: ~/Library/Application Support/iq-leetbuddy/.env
+  //   Windows: %APPDATA%/iq-leetbuddy/.env
+  //   Linux: ~/.config/iq-leetbuddy/.env
+  // 개발 모드: 프로젝트 루트
+  if (app.isPackaged) {
+    return path.join(app.getPath('userData'), '.env');
+  }
   return path.join(__dirname, '../../.env');
 }
 
@@ -75,7 +84,13 @@ export async function saveSettings(updates: AppSettings): Promise<void> {
   let content = '';
   try {
     content = await fs.readFile(envPath(), 'utf-8');
-  } catch {}
+  } catch {
+    // .env 파일 없으면 패키지 모드라도 userData 폴더는 존재 (electron이 자동 생성).
+    // 다만 안전을 위해 디렉토리 보장.
+    try {
+      await fs.mkdir(path.dirname(envPath()), { recursive: true });
+    } catch {}
+  }
 
   const lines = content.split('\n');
   const seen = new Set<string>();

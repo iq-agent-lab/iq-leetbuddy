@@ -16,7 +16,13 @@ import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { registerIpcHandlers, setLeetCodeOpener, setShortcutGetter } from './ipc';
 
-dotenv.config({ path: path.join(__dirname, '../../.env') });
+// .env 로드 — 패키지 모드는 userData, dev 모드는 프로젝트 루트
+function loadEnv() {
+  const envFile = app.isPackaged
+    ? path.join(app.getPath('userData'), '.env')
+    : path.join(__dirname, '../../.env');
+  dotenv.config({ path: envFile });
+}
 
 let mainWindow: BrowserWindow | null = null;
 let leetcodeWindow: BrowserWindow | null = null;
@@ -298,6 +304,22 @@ function createAppMenu() {
 
 // ─── 부트스트랩 ──────────────────────────────
 app.whenReady().then(() => {
+  loadEnv(); // app.isPackaged + app.getPath('userData') 사용 가능 시점
+
+  // macOS Dock 아이콘 명시 (개발 모드에서도 코랄 행성 보이게)
+  // 패키징된 앱은 .icns가 자동 사용됨
+  if (process.platform === 'darwin' && app.dock) {
+    const iconPath = path.join(__dirname, '../../build/icon.png');
+    try {
+      const dockImage = nativeImage.createFromPath(iconPath);
+      if (!dockImage.isEmpty()) {
+        app.dock.setIcon(dockImage);
+      }
+    } catch {
+      // 무시 - 패키지된 앱은 어차피 .icns 사용
+    }
+  }
+
   registerShortcuts(); // 트레이/메뉴 빌드 전에 단축키 등록
 
   // IPC에 의존성 주입

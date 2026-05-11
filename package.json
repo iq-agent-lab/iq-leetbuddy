@@ -1,6 +1,6 @@
 {
   "name": "iq-leetbuddy",
-  "version": "0.2.8",
+  "version": "0.3.0",
   "description": "LeetCode 풀이를 한국어로 번역하고 AI 회고를 생성해 GitHub에 자동 업로드하는 데스크톱 에이전트",
   "main": "dist/main/index.js",
   "scripts": {
@@ -8,7 +8,13 @@
     "start": "npm run build && electron .",
     "dev": "npm run build && electron . --dev",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist release",
+    "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:mac-universal": "npm run build && electron-builder --mac --arm64 --x64",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "pack": "npm run build && electron-builder --dir"
   },
   "keywords": ["leetcode", "electron", "agent", "anthropic", "claude"],
   "license": "MIT",
@@ -23,6 +29,57 @@
   "devDependencies": {
     "@types/node": "^20.11.0",
     "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
     "typescript": "^5.4.0"
+  },
+  "build": {
+    "appId": "com.iq-agent-lab.leetbuddy",
+    "productName": "iq-leetbuddy",
+    "copyright": "Copyright © 2025 IQ",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json",
+      "!**/*.{ts,tsx,map}",
+      "!**/{tsconfig.json,.git,.github}",
+      "!src/**",
+      "!scripts/**"
+    ],
+    "extraResources": [
+      {
+        "from": ".env.example",
+        "to": ".env.example"
+      }
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "zip",
+          "arch": ["arm64", "x64"]
+        }
+      ],
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "icon": "build/icon.png",
+      "category": "Development",
+      "synopsis": "LeetCode 풀이 자동 정리 에이전트"
+    },
+    "publish": null
   }
 }

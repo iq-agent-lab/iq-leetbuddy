@@ -1,0 +1,64 @@
+name: Release
+
+# git tag (v0.3.0, v0.3.1, ...)를 push하면 자동으로
+# macOS / Windows / Linux 빌드 후 GitHub Releases에 업로드.
+#
+# 사용법:
+#   git tag v0.3.0
+#   git push origin v0.3.0
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: # 수동 실행 옵션
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            artifact-pattern: 'release/*.zip'
+          - os: windows-latest
+            artifact-pattern: 'release/*.exe'
+          - os: ubuntu-latest
+            artifact-pattern: 'release/*.AppImage'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build & Package
+        run: npm run dist
+        env:
+          # 코드 서명 자동 탐색 끔 (Apple Developer cert 없음 - personal tool)
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.zip
+            release/*.exe
+            release/*.AppImage
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
