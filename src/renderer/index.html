@@ -43,10 +43,18 @@
       </div>
       <div class="step-body">
         <h2 class="step-title">문제 가져오기</h2>
-        <p class="step-hint">URL · slug · 문제 이름 모두 OK. 예: <code>two-sum</code> · <code>Symmetric Tree</code></p>
+        <p class="step-hint">
+          URL · slug · 문제 이름 모두 OK<br>
+          <span class="hint-examples">
+            <code>two-sum</code> ·
+            <code>Symmetric Tree</code> ·
+            <code>https://leetcode.com/problems/.../description/?envType=...&envId=...</code>
+          </span>
+          <span class="hint-note">LeetCode 어떤 페이지든 주소창 그대로 붙여넣으면 됨 (envType, envId 쿼리 자동 무시)</span>
+        </p>
         <div class="input-row">
           <input id="problem-input" type="text" placeholder="LeetCode 문제 URL 또는 slug를 입력해주세요" autocomplete="off" spellcheck="false">
-          <button id="fetch-btn" class="primary">불러오기</button>
+          <button id="fetch-btn" class="primary"><span class="btn-content">불러오기</span></button>
         </div>
       </div>
     </section>
@@ -79,7 +87,9 @@
         <h2 class="step-title">통과한 코드 업로드</h2>
         <p class="step-hint">LeetCode에서 Accepted된 코드를 그대로 붙여넣어. AI 회고와 함께 GitHub에 올라가.</p>
         <textarea id="code-input" placeholder="// 여기에 통과한 코드를 붙여넣어주세요" rows="18" spellcheck="false"></textarea>
-        <button id="upload-btn" class="primary block">AI 회고 생성 후 GitHub에 업로드</button>
+        <button id="upload-btn" class="primary block">
+          <span class="btn-content">AI 회고 생성 후 GitHub에 업로드</span>
+        </button>
       </div>
     </section>
 
@@ -97,7 +107,7 @@
   </main>
 
   <footer class="app-footer">
-    <span>iq-agent-lab · v0.2.4</span>
+    <span>iq-agent-lab · v0.2.5</span>
     <span class="footer-divider">·</span>
     <span id="config-status">설정 확인 중...</span>
     <span class="footer-divider">·</span>

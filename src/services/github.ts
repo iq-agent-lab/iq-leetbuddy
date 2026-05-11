@@ -5,6 +5,51 @@ import { Octokit } from '@octokit/rest';
 import { LeetCodeProblem, UploadResult } from '../types';
 import { langToExt } from '../util/language';
 
+// GitHub API 에러를 진단 가능한 한국어 메시지로 변환
+function toGitHubError(
+  err: unknown,
+  context: { owner: string; repo: string; branch: string; stage: string }
+): Error {
+  const e = err as { status?: number; message?: string };
+  const where = `[${context.stage}] ${context.owner}/${context.repo} · ${context.branch}`;
+
+  if (e?.status === 404) {
+    return new Error(
+      `GitHub 리소스를 찾을 수 없습니다 (404)
+현재 설정: ${context.owner}/${context.repo} (브랜치: ${context.branch})
+
+가능한 원인:
+• 레포 이름 불일치 — 설정의 GITHUB_REPO 값과 실제 GitHub 레포 이름이 다름
+• 브랜치 이름이 다름 — main이 아니라 master일 수도
+• 레포가 비어있음 — 첫 commit이 있어야 함 (README 하나 추가)
+• PAT 권한 부족 — fine-grained 토큰이면 이 레포가 허용 목록에 있는지 확인
+
+확인:
+• https://github.com/${context.owner}/${context.repo} 접속 가능한지
+• 헤더 우측 ⚙️ 클릭해 owner/repo/branch 정확한지 확인`
+    );
+  }
+  if (e?.status === 401) {
+    return new Error(
+      'GitHub 토큰이 유효하지 않습니다 (401)\n헤더 ⚙️ 설정에서 새 PAT를 입력해주세요.'
+    );
+  }
+  if (e?.status === 403) {
+    return new Error(
+      `GitHub 토큰 권한 부족 (403)\nPAT 발급 시 repo scope (또는 public_repo) 체크 필요.\n토큰: https://github.com/settings/tokens`
+    );
+  }
+  if (e?.status === 409) {
+    return new Error(
+      `레포 충돌 상태 (409)\n${where}\n레포가 비어있을 가능성. README 하나 추가 후 재시도.`
+    );
+  }
+  if (e?.status === 422) {
+    return new Error(`요청 형식 오류 (422) ${where}\n${e.message || ''}`);
+  }
+  return new Error(`${e?.message || String(err)} ${where}`);
+}
+
 let _octokit: Octokit | null = null;
 function octokit(): Octokit {
   if (!_octokit) {
@@ -33,64 +78,90 @@ async function commitFiles(
   message: string
 ): Promise<{ sha: string; url: string }> {
   const o = octokit();
+  const ctx = { owner, repo, branch };
 
-  // 1. 현재 브랜치의 최신 commit SHA
-  const { data: refData } = await o.git.getRef({
-    owner,
-    repo,
-    ref: `heads/${branch}`,
-  });
-  const latestCommitSha = refData.object.sha;
+  let latestCommitSha: string;
+  try {
+    const { data: refData } = await o.git.getRef({
+      owner,
+      repo,
+      ref: `heads/${branch}`,
+    });
+    latestCommitSha = refData.object.sha;
+  } catch (err) {
+    throw toGitHubError(err, { ...ctx, stage: 'getRef' });
+  }
 
-  // 2. 그 commit의 tree SHA (base tree)
-  const { data: commitData } = await o.git.getCommit({
-    owner,
-    repo,
-    commit_sha: latestCommitSha,
-  });
-  const baseTreeSha = commitData.tree.sha;
+  let baseTreeSha: string;
+  try {
+    const { data: commitData } = await o.git.getCommit({
+      owner,
+      repo,
+      commit_sha: latestCommitSha,
+    });
+    baseTreeSha = commitData.tree.sha;
+  } catch (err) {
+    throw toGitHubError(err, { ...ctx, stage: 'getCommit' });
+  }
 
-  // 3. 각 파일을 blob으로 업로드
-  const blobs = await Promise.all(
-    files.map((f) =>
-      o.git.createBlob({
-        owner,
-        repo,
-        content: Buffer.from(f.content, 'utf-8').toString('base64'),
-        encoding: 'base64',
-      })
-    )
-  );
+  let blobs;
+  try {
+    blobs = await Promise.all(
+      files.map((f) =>
+        o.git.createBlob({
+          owner,
+          repo,
+          content: Buffer.from(f.content, 'utf-8').toString('base64'),
+          encoding: 'base64',
+        })
+      )
+    );
+  } catch (err) {
+    throw toGitHubError(err, { ...ctx, stage: 'createBlob' });
+  }
 
-  // 4. 새 tree 생성 (base tree 위에 파일들 추가/덮어쓰기)
-  const { data: newTree } = await o.git.createTree({
-    owner,
-    repo,
-    base_tree: baseTreeSha,
-    tree: files.map((f, i) => ({
-      path: f.path,
-      mode: '100644',
-      type: 'blob',
-      sha: blobs[i].data.sha,
-    })),
-  });
+  let newTree;
+  try {
+    const result = await o.git.createTree({
+      owner,
+      repo,
+      base_tree: baseTreeSha,
+      tree: files.map((f, i) => ({
+        path: f.path,
+        mode: '100644',
+        type: 'blob',
+        sha: blobs[i].data.sha,
+      })),
+    });
+    newTree = result.data;
+  } catch (err) {
+    throw toGitHubError(err, { ...ctx, stage: 'createTree' });
+  }
 
-  // 5. 새 commit 생성
-  const { data: newCommit } = await o.git.createCommit({
-    owner,
-    repo,
-    message,
-    tree: newTree.sha,
-    parents: [latestCommitSha],
-  });
+  let newCommit;
+  try {
+    const result = await o.git.createCommit({
+      owner,
+      repo,
+      message,
+      tree: newTree.sha,
+      parents: [latestCommitSha],
+    });
+    newCommit = result.data;
+  } catch (err) {
+    throw toGitHubError(err, { ...ctx, stage: 'createCommit' });
+  }
 
-  // 6. 브랜치 ref 업데이트
-  await o.git.updateRef({
-    owner,
-    repo,
-    ref: `heads/${branch}`,
-    sha: newCommit.sha,
-  });
+  try {
+    await o.git.updateRef({
+      owner,
+      repo,
+      ref: `heads/${branch}`,
+      sha: newCommit.sha,
+    });
+  } catch (err) {
+    throw toGitHubError(err, { ...ctx, stage: 'updateRef' });
+  }
 
   return {
     sha: newCommit.sha,

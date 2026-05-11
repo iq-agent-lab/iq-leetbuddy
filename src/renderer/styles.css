@@ -710,6 +710,65 @@ textarea::-webkit-scrollbar-track {
 #config-status.warning { color: var(--accent-soft); }
 #config-status.ok { color: var(--success); }
 
+/* ─── spinner & button content ─── */
+.btn-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1;
+}
+
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── multi-line error detail ─── */
+.error-detail {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.65;
+  background: var(--bg-soft);
+  border: 1px solid rgba(217, 112, 112, 0.2);
+  border-radius: 4px;
+  padding: 12px 14px;
+  margin-top: 8px;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+/* ─── hint examples & note ─── */
+.hint-examples {
+  display: inline-block;
+  margin-top: 6px;
+}
+
+.hint-examples code {
+  margin-right: 4px;
+}
+
+.hint-note {
+  display: block;
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
 .hidden { display: none !important; }
 
 /* ─── settings modal ─── */

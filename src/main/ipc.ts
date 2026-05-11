@@ -24,18 +24,20 @@ function toErrorMessage(err: unknown): string {
 }
 
 export function registerIpcHandlers() {
-  ipcMain.handle('fetch-problem', async (_event, input: string) => {
+  ipcMain.handle('fetch-problem', async (event, input: string) => {
+    const send = (stage: string) => event.sender.send('fetch-progress', stage);
     try {
-      const result = await fetchAndTranslate(input);
+      const result = await fetchAndTranslate(input, send);
       return { ok: true, ...result };
     } catch (err) {
       return { ok: false, error: toErrorMessage(err) };
     }
   });
 
-  ipcMain.handle('upload-solution', async (_event, payload) => {
+  ipcMain.handle('upload-solution', async (event, payload) => {
+    const send = (stage: string) => event.sender.send('upload-progress', stage);
     try {
-      const result = await annotateAndUpload(payload);
+      const result = await annotateAndUpload(payload, send);
       return { ok: true, ...result };
     } catch (err) {
       return { ok: false, error: toErrorMessage(err) };

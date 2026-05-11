@@ -2,6 +2,28 @@
 
 const $ = (id) => document.getElementById(id);
 
+const FETCH_PROGRESS_TEXT = {
+  fetching: 'LeetCode에서 문제 가져오는 중...',
+  translating: '한국어로 번역 중...',
+};
+
+const UPLOAD_PROGRESS_TEXT = {
+  annotating: 'AI 회고 작성 중...',
+  uploading: 'GitHub에 commit 중...',
+};
+
+function setButtonLoading(btnId, loadingText) {
+  const btn = $(btnId);
+  btn.disabled = true;
+  btn.querySelector('.btn-content').innerHTML = `<span class="spinner"></span>${loadingText}`;
+}
+
+function resetButton(btnId, originalText) {
+  const btn = $(btnId);
+  btn.disabled = false;
+  btn.querySelector('.btn-content').textContent = originalText;
+}
+
 const state = {
   problem: null,
   translation: '',
@@ -111,7 +133,7 @@ async function handleFetch() {
   }
 
   setStatus('문제 가져오는 중...', 'busy');
-  $('fetch-btn').disabled = true;
+  setButtonLoading('fetch-btn', '가져오는 중...');
 
   try {
     const result = await window.api.fetchProblem(input);
@@ -130,7 +152,7 @@ async function handleFetch() {
   } catch (e) {
     setStatus(`에러: ${e.message}`, 'error');
   } finally {
-    $('fetch-btn').disabled = false;
+    resetButton('fetch-btn', '불러오기');
   }
 }
 
@@ -145,8 +167,8 @@ async function handleUpload() {
     return;
   }
 
-  setStatus('AI 회고 생성 중... (15-30초)', 'busy');
-  $('upload-btn').disabled = true;
+  setStatus('AI 회고 작성 중...', 'busy');
+  setButtonLoading('upload-btn', 'AI 회고 작성 중...');
 
   try {
     const result = await window.api.uploadSolution({
@@ -171,11 +193,16 @@ async function handleUpload() {
   } catch (e) {
     const out = $('result-output');
     out.classList.add('error');
-    out.innerHTML = `<strong>✗ 업로드 실패</strong><div>${e.message}</div>`;
+    // 줄바꿈을 보존하면서 HTML 안전하게 표시
+    const escaped = e.message
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    out.innerHTML = `<strong>✗ 업로드 실패</strong><pre class="error-detail">${escaped}</pre>`;
     showStep(4);
-    setStatus(`에러: ${e.message}`, 'error');
+    setStatus('업로드 실패 · 메시지 확인', 'error');
   } finally {
-    $('upload-btn').disabled = false;
+    resetButton('upload-btn', 'AI 회고 생성 후 GitHub에 업로드');
   }
 }
 
@@ -266,4 +293,19 @@ document.addEventListener('keydown', (e) => {
 window.addEventListener('DOMContentLoaded', () => {
   checkConfig();
   $('problem-input').focus();
+
+  // 진행 상황 listeners
+  window.api.onFetchProgress((stage) => {
+    const text = FETCH_PROGRESS_TEXT[stage];
+    if (!text) return;
+    setStatus(text, 'busy');
+    setButtonLoading('fetch-btn', text);
+  });
+
+  window.api.onUploadProgress((stage) => {
+    const text = UPLOAD_PROGRESS_TEXT[stage];
+    if (!text) return;
+    setStatus(text, 'busy');
+    setButtonLoading('upload-btn', text);
+  });
 });

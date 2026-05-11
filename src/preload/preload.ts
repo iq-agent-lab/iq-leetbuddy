@@ -15,4 +15,15 @@ contextBridge.exposeInMainWorld('api', {
   saveSettings: (settings: Record<string, string>) =>
     ipcRenderer.invoke('save-settings', settings),
   openLeetCode: (url?: string) => ipcRenderer.invoke('open-leetcode', url),
+
+  onFetchProgress: (cb: (stage: string) => void) => {
+    const handler = (_e: unknown, stage: string) => cb(stage);
+    ipcRenderer.on('fetch-progress', handler);
+    return () => ipcRenderer.removeListener('fetch-progress', handler);
+  },
+  onUploadProgress: (cb: (stage: string) => void) => {
+    const handler = (_e: unknown, stage: string) => cb(stage);
+    ipcRenderer.on('upload-progress', handler);
+    return () => ipcRenderer.removeListener('upload-progress', handler);
+  },
 });
