@@ -27,4 +27,15 @@ copyFile('src/renderer/index.html', 'dist/renderer/index.html');
 copyFile('src/renderer/styles.css', 'dist/renderer/styles.css');
 copyFile('src/renderer/renderer.js', 'dist/renderer/renderer.js');
 copyDir('assets', 'dist/assets');
+
+// highlight.js vendor 파일 — CDN 안 쓰고 로컬 번들 (CSP 깔끔, 오프라인 OK)
+copyFile(
+  'node_modules/@highlightjs/cdn-assets/highlight.min.js',
+  'dist/vendor/highlight.min.js'
+);
+copyFile(
+  'node_modules/@highlightjs/cdn-assets/styles/atom-one-dark.min.css',
+  'dist/vendor/highlight-theme.css'
+);
+
 console.log('Done.');

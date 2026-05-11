@@ -119,11 +119,49 @@ function populateLanguageSelect(snippets) {
   $('starter-block').classList.remove('hidden');
 }
 
+// LeetCode langSlug → highlight.js 언어명 매핑
+const HLJS_LANG_MAP = {
+  python: 'python',
+  python3: 'python',
+  java: 'java',
+  javascript: 'javascript',
+  typescript: 'typescript',
+  cpp: 'cpp',
+  c: 'c',
+  csharp: 'csharp',
+  'c#': 'csharp',
+  go: 'go',
+  golang: 'go',
+  rust: 'rust',
+  kotlin: 'kotlin',
+  swift: 'swift',
+  ruby: 'ruby',
+  scala: 'scala',
+  php: 'php',
+  dart: 'dart',
+  elixir: 'elixir',
+  erlang: 'erlang',
+};
+
 function updateStarterCode() {
   if (!state.problem) return;
   const slug = state.selectedLang;
   const snip = state.problem.codeSnippets?.find((s) => s.langSlug === slug);
-  $('starter-code').textContent = snip ? snip.code : '// 해당 언어의 시작 코드가 없습니다';
+  const codeEl = $('starter-code');
+
+  codeEl.textContent = snip ? snip.code : '// 해당 언어의 시작 코드가 없습니다';
+
+  // highlight.js 적용
+  if (window.hljs && snip) {
+    const hlLang = HLJS_LANG_MAP[slug] || 'plaintext';
+    codeEl.className = `language-${hlLang}`;
+    delete codeEl.dataset.highlighted;
+    try {
+      window.hljs.highlightElement(codeEl);
+    } catch (e) {
+      // 알 수 없는 언어 등은 plaintext로 떨어지면 됨
+    }
+  }
 }
 
 async function handleFetch() {
@@ -291,6 +329,7 @@ async function openSettings() {
   $('setting-github-owner').value = settings.GITHUB_OWNER || '';
   $('setting-github-repo').value = settings.GITHUB_REPO || '';
   $('setting-github-branch').value = settings.GITHUB_BRANCH || '';
+  $('pat-help-panel').classList.add('hidden'); // 매번 새로 열 때 접힌 상태로
   $('settings-modal').classList.remove('hidden');
 }
 
@@ -337,6 +376,10 @@ $('open-settings-btn').addEventListener('click', openSettings);
 $('close-settings').addEventListener('click', closeSettings);
 $('cancel-settings').addEventListener('click', closeSettings);
 $('save-settings').addEventListener('click', saveSettings);
+
+$('pat-help-btn').addEventListener('click', () => {
+  $('pat-help-panel').classList.toggle('hidden');
+});
 
 $('settings-modal').addEventListener('click', (e) => {
   if (e.target.id === 'settings-modal') closeSettings();
