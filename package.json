@@ -1,0 +1,32 @@
+{
+  "name": "iq-leetbuddy",
+  "version": "0.1.0",
+  "description": "LeetCode 풀이를 한국어로 번역하고 AI 회고를 생성해 GitHub에 자동 업로드하는 데스크톱 에이전트",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build": "tsc && node scripts/copy-assets.js",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron . --dev",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "leetcode",
+    "electron",
+    "agent",
+    "anthropic",
+    "claude"
+  ],
+  "license": "MIT",
+  "author": "IQ (e9ua1)",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.95.0",
+    "@octokit/rest": "^20.1.2",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "electron": "^33.0.0",
+    "typescript": "^5.4.0"
+  }
+}
