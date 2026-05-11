@@ -1,6 +1,6 @@
 {
   "name": "iq-leetbuddy",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "LeetCode 풀이를 한국어로 번역하고 AI 회고를 생성해 GitHub에 자동 업로드하는 데스크톱 에이전트",
   "main": "dist/main/index.js",
   "scripts": {
@@ -16,7 +16,13 @@
     "dist:linux": "npm run build && electron-builder --linux",
     "pack": "npm run build && electron-builder --dir"
   },
-  "keywords": ["leetcode", "electron", "agent", "anthropic", "claude"],
+  "keywords": [
+    "leetcode",
+    "electron",
+    "agent",
+    "anthropic",
+    "claude"
+  ],
   "license": "MIT",
   "author": "IQ (e9ua1)",
   "dependencies": {
@@ -61,7 +67,10 @@
       "target": [
         {
           "target": "zip",
-          "arch": ["arm64", "x64"]
+          "arch": [
+            "arm64",
+            "x64"
+          ]
         }
       ],
       "hardenedRuntime": false,
@@ -71,7 +80,14 @@
       "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "build/icon.png",
       "artifactName": "${productName}-${version}-windows-x64.${ext}"
     },
@@ -84,7 +100,9 @@
       "shortcutName": "iq-leetbuddy"
     },
     "linux": {
-      "target": ["AppImage"],
+      "target": [
+        "AppImage"
+      ],
       "icon": "build/icon.png",
       "category": "Development",
       "synopsis": "LeetCode 풀이 자동 정리 에이전트",
