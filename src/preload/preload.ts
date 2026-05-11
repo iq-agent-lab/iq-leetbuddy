@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('save-settings', settings),
   openLeetCode: (url?: string) => ipcRenderer.invoke('open-leetcode', url),
   createRepo: () => ipcRenderer.invoke('create-repo'),
+  verifyGithub: () => ipcRenderer.invoke('verify-github'),
 
   onFetchProgress: (cb: (stage: string) => void) => {
     const handler = (_e: unknown, stage: string) => cb(stage);

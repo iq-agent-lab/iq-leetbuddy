@@ -10,6 +10,7 @@ const FETCH_PROGRESS_TEXT = {
 const UPLOAD_PROGRESS_TEXT = {
   annotating: 'AI 회고 작성 중...',
   uploading: 'GitHub에 commit 중...',
+  'creating-repo': '레포 자동 생성 중...',
 };
 
 function setButtonLoading(btnId, loadingText) {
@@ -164,6 +165,32 @@ function updateStarterCode() {
   }
 }
 
+// 통과 코드 textarea의 hljs overlay 갱신
+function updateCodeHighlight() {
+  const code = $('code-input').value;
+  const codeEl = $('code-highlight-content');
+  // 끝 newline 처리 - textarea 마지막에 newline 없으면 overlay가 살짝 짧아짐
+  codeEl.textContent = code.endsWith('\n') ? code + ' ' : code + '\n';
+
+  if (window.hljs) {
+    const slug = state.selectedLang || 'python3';
+    const hlLang = HLJS_LANG_MAP[slug] || 'plaintext';
+    codeEl.className = `language-${hlLang}`;
+    delete codeEl.dataset.highlighted;
+    try {
+      window.hljs.highlightElement(codeEl);
+    } catch (e) {}
+  }
+}
+
+function syncCodeScroll() {
+  const ta = $('code-input');
+  const overlay = document.querySelector('.code-highlight-overlay');
+  if (!overlay) return;
+  overlay.scrollTop = ta.scrollTop;
+  overlay.scrollLeft = ta.scrollLeft;
+}
+
 async function handleFetch() {
   const input = $('problem-input').value.trim();
   if (!input) {
@@ -314,6 +341,7 @@ function reset() {
   $('code-input').value = '';
   $('translation-output').innerHTML = '';
   $('starter-code').textContent = '';
+  $('code-highlight-content').textContent = '';
   $('result-output').innerHTML = '';
   ['step-2', 'step-3', 'step-4'].forEach((id) => $(id).classList.add('hidden'));
   $('starter-block').classList.add('hidden');
@@ -321,15 +349,44 @@ function reset() {
 }
 
 // ─── 설정 모달 ───
+function setSectionStatus(elementId, hasValue) {
+  const el = $(elementId);
+  if (hasValue) {
+    el.textContent = '✓ 저장됨';
+    el.dataset.state = 'saved';
+  } else {
+    el.textContent = '⚠ 필요';
+    el.dataset.state = 'empty';
+  }
+}
+
 async function openSettings() {
   const settings = await window.api.getSettings();
-  $('setting-anthropic-key').value = settings.ANTHROPIC_API_KEY || '';
+  $('setting-anthropic-key').value = ''; // 시크릿은 항상 비움
   $('setting-anthropic-model').value = settings.ANTHROPIC_MODEL || '';
-  $('setting-github-token').value = settings.GITHUB_TOKEN || '';
+  $('setting-github-token').value = ''; // 시크릿은 항상 비움
   $('setting-github-owner').value = settings.GITHUB_OWNER || '';
   $('setting-github-repo').value = settings.GITHUB_REPO || '';
   $('setting-github-branch').value = settings.GITHUB_BRANCH || '';
-  $('pat-help-panel').classList.add('hidden'); // 매번 새로 열 때 접힌 상태로
+  $('setting-auto-create-repo').checked = !!settings.GITHUB_AUTO_CREATE_REPO;
+
+  // 저장 상태 시각적 표시
+  setSectionStatus('anthropic-status', settings.hasAnthropicKey);
+  // GitHub은 token + owner + repo 셋 다 있어야 "완전 설정"
+  const githubComplete =
+    settings.hasGithubToken && settings.GITHUB_OWNER && settings.GITHUB_REPO;
+  setSectionStatus('github-status', githubComplete);
+
+  // 토큰 입력란 placeholder를 상태 반영
+  $('setting-anthropic-key').placeholder = settings.hasAnthropicKey
+    ? '(저장됨 · 변경하려면 새 키 입력)'
+    : 'sk-ant-...';
+  $('setting-github-token').placeholder = settings.hasGithubToken
+    ? '(저장됨 · 변경하려면 새 토큰 입력)'
+    : 'ghp_...';
+
+  $('pat-help-panel').classList.add('hidden');
+  $('verify-result').classList.add('hidden');
   $('settings-modal').classList.remove('hidden');
 }
 
@@ -345,6 +402,7 @@ async function saveSettings() {
     GITHUB_OWNER: $('setting-github-owner').value,
     GITHUB_REPO: $('setting-github-repo').value,
     GITHUB_BRANCH: $('setting-github-branch').value,
+    GITHUB_AUTO_CREATE_REPO: $('setting-auto-create-repo').checked ? 'true' : 'false',
   };
 
   $('save-settings').disabled = true;
@@ -361,6 +419,76 @@ async function saveSettings() {
   }
 }
 
+async function handleVerifyGithub() {
+  const btn = $('verify-github-btn');
+  const result = $('verify-result');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>확인 중...';
+  result.classList.remove('hidden', 'ok', 'warn', 'fail');
+  result.classList.add('busy');
+  result.textContent = '연결 확인 중...';
+
+  try {
+    const r = await window.api.verifyGithub();
+    if (!r.ok) {
+      result.classList.remove('busy');
+      result.classList.add('fail');
+      result.innerHTML = `<strong>✗ 실패</strong><div>${escapeHtml(r.error)}</div>`;
+      return;
+    }
+
+    result.classList.remove('busy');
+    if (r.repoExists) {
+      const branchNote = r.branchMatches
+        ? ''
+        : ` <span class="result-warn">⚠ 설정 브랜치 '${r.configuredBranch}' ≠ 레포 default '${r.repoDefaultBranch}'</span>`;
+      result.classList.add('ok');
+      result.innerHTML = `
+        <strong>✓ 연결 정상</strong>
+        <div>인증: @${r.authedAs}</div>
+        <div>레포: <a href="${r.repoUrl}" target="_blank" rel="noopener">${r.owner}/${r.repo}</a>${branchNote}</div>
+      `;
+    } else {
+      result.classList.add('warn');
+      result.innerHTML = `
+        <strong>⚠ 레포가 없어요</strong>
+        <div>인증: @${r.authedAs}</div>
+        <div>설정: ${r.owner}/${r.repo}</div>
+        <div class="action-row">
+          <button class="primary" id="verify-create-btn">지금 이 이름으로 만들기 (public)</button>
+        </div>
+      `;
+      $('verify-create-btn').addEventListener('click', async () => {
+        const cb = $('verify-create-btn');
+        cb.disabled = true;
+        cb.innerHTML = '<span class="spinner"></span>레포 생성 중...';
+        try {
+          const createRes = await window.api.createRepo();
+          if (!createRes.ok) throw new Error(createRes.error);
+          result.classList.remove('warn');
+          result.classList.add('ok');
+          result.innerHTML = `
+            <strong>✓ 레포 생성 완료</strong>
+            <div>${createRes.scope === 'user' ? '본인 계정' : '조직'}에 public 레포 생성됨</div>
+            <div><a href="${createRes.url}" target="_blank" rel="noopener">${r.owner}/${r.repo}</a></div>
+          `;
+        } catch (e) {
+          result.classList.remove('warn');
+          result.classList.add('fail');
+          result.innerHTML = `<strong>✗ 레포 생성 실패</strong><div>${escapeHtml(e.message)}</div>`;
+        }
+      });
+    }
+  } catch (e) {
+    result.classList.remove('busy');
+    result.classList.add('fail');
+    result.innerHTML = `<strong>✗ 실패</strong><div>${escapeHtml(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'GitHub 연결 확인';
+  }
+}
+
 // ─── listeners ───
 $('fetch-btn').addEventListener('click', handleFetch);
 $('upload-btn').addEventListener('click', handleUpload);
@@ -370,6 +498,7 @@ $('problem-input').addEventListener('keypress', (e) => {
 $('starter-lang-select').addEventListener('change', (e) => {
   state.selectedLang = e.target.value;
   updateStarterCode();
+  updateCodeHighlight(); // 통과 코드도 같은 언어로 hl 갱신
 });
 $('open-leetcode-btn').addEventListener('click', () => window.api.openLeetCode());
 $('open-settings-btn').addEventListener('click', openSettings);
@@ -380,6 +509,12 @@ $('save-settings').addEventListener('click', saveSettings);
 $('pat-help-btn').addEventListener('click', () => {
   $('pat-help-panel').classList.toggle('hidden');
 });
+
+$('verify-github-btn').addEventListener('click', handleVerifyGithub);
+
+// textarea ↔ overlay 동기화
+$('code-input').addEventListener('input', updateCodeHighlight);
+$('code-input').addEventListener('scroll', syncCodeScroll);
 
 $('settings-modal').addEventListener('click', (e) => {
   if (e.target.id === 'settings-modal') closeSettings();

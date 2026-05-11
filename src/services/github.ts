@@ -258,3 +258,59 @@ export async function createRepoIfMissing(): Promise<{
     throw toGitHubError(err, { owner, repo, branch: 'main', stage: 'createRepo' });
   }
 }
+
+// 연결 진단: 토큰 유효성 + 레포 존재 확인 + 브랜치 일치 여부
+export async function verifyConnection(): Promise<{
+  authedAs: string;
+  owner: string;
+  repo: string;
+  repoExists: boolean;
+  repoUrl?: string;
+  repoDefaultBranch?: string;
+  configuredBranch: string;
+  branchMatches?: boolean;
+}> {
+  const owner = process.env.GITHUB_OWNER;
+  const repo = process.env.GITHUB_REPO;
+  const branch = process.env.GITHUB_BRANCH || 'main';
+
+  if (!owner || !repo) {
+    throw new Error('GITHUB_OWNER 또는 GITHUB_REPO가 설정되지 않았습니다');
+  }
+
+  const o = octokit();
+
+  let authedAs: string;
+  try {
+    const { data } = await o.users.getAuthenticated();
+    authedAs = data.login;
+  } catch (err) {
+    throw toGitHubError(err, { owner, repo, branch, stage: 'verify/auth' });
+  }
+
+  try {
+    const { data } = await o.repos.get({ owner, repo });
+    return {
+      authedAs,
+      owner,
+      repo,
+      repoExists: true,
+      repoUrl: data.html_url,
+      repoDefaultBranch: data.default_branch,
+      configuredBranch: branch,
+      branchMatches: data.default_branch === branch,
+    };
+  } catch (err) {
+    const e = err as { status?: number };
+    if (e?.status === 404) {
+      return {
+        authedAs,
+        owner,
+        repo,
+        repoExists: false,
+        configuredBranch: branch,
+      };
+    }
+    throw toGitHubError(err, { owner, repo, branch, stage: 'verify/repo' });
+  }
+}

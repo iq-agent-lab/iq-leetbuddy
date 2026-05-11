@@ -4,8 +4,8 @@ import { ipcMain } from 'electron';
 import { fetchAndTranslate, annotateAndUpload } from '../services/pipeline';
 import { resetTranslatorClient } from '../services/translator';
 import { resetAnnotatorClient } from '../services/annotator';
-import { resetGithubClient, createRepoIfMissing } from '../services/github';
-import { getMaskedSettings, saveSettings, AppSettings } from './settings';
+import { resetGithubClient, createRepoIfMissing, verifyConnection } from '../services/github';
+import { getSettingsView, saveSettings, AppSettings } from './settings';
 
 let leetcodeOpener: ((url?: string) => void) | null = null;
 let shortcutGetter: (() => string | null) | null = null;
@@ -72,9 +72,19 @@ export function registerIpcHandlers() {
     };
   });
 
-  // ── 설정 (마스킹된 현재값 반환) ──
+  // ── 설정 (시크릿은 노출하지 않고 hasXxx 플래그로) ──
   ipcMain.handle('get-settings', async () => {
-    return getMaskedSettings();
+    return getSettingsView();
+  });
+
+  // ── GitHub 연결 진단 (토큰 + 레포 존재 확인) ──
+  ipcMain.handle('verify-github', async () => {
+    try {
+      const result = await verifyConnection();
+      return { ok: true, ...result };
+    } catch (err) {
+      return { ok: false, error: toErrorMessage(err), status: getStatus(err) };
+    }
   });
 
   // ── 설정 저장 ──

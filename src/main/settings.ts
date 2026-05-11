@@ -3,9 +3,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { app } from 'electron';
 
-// 빌드 후 위치 기준: dist/main/settings.js → ../../.env
 function envPath(): string {
   return path.join(__dirname, '../../.env');
 }
@@ -17,6 +15,7 @@ const MANAGED_KEYS = [
   'GITHUB_OWNER',
   'GITHUB_REPO',
   'GITHUB_BRANCH',
+  'GITHUB_AUTO_CREATE_REPO',
 ] as const;
 
 type ManagedKey = (typeof MANAGED_KEYS)[number];
@@ -28,45 +27,59 @@ export interface AppSettings {
   GITHUB_OWNER?: string;
   GITHUB_REPO?: string;
   GITHUB_BRANCH?: string;
+  GITHUB_AUTO_CREATE_REPO?: string;
 }
 
-const MASK = '••••••••';
+export interface SettingsView {
+  ANTHROPIC_API_KEY: string;          // 항상 빈 문자열 (보안)
+  ANTHROPIC_MODEL: string;
+  GITHUB_TOKEN: string;                // 항상 빈 문자열 (보안)
+  GITHUB_OWNER: string;
+  GITHUB_REPO: string;
+  GITHUB_BRANCH: string;
+  GITHUB_AUTO_CREATE_REPO: boolean;
+  hasAnthropicKey: boolean;            // 저장된 키가 존재하는가?
+  hasGithubToken: boolean;
+}
 
-// 마스킹된 현재 설정 (UI 표시용)
-export function getMaskedSettings(): Record<string, string> {
+const SECRET_KEYS = new Set<string>(['ANTHROPIC_API_KEY', 'GITHUB_TOKEN']);
+
+// 시크릿은 노출하지 않고 has-* 플래그로 존재 여부만 알림
+export function getSettingsView(): SettingsView {
   return {
-    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ? MASK : '',
+    ANTHROPIC_API_KEY: '',
     ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
-    GITHUB_TOKEN: process.env.GITHUB_TOKEN ? MASK : '',
+    GITHUB_TOKEN: '',
     GITHUB_OWNER: process.env.GITHUB_OWNER || '',
     GITHUB_REPO: process.env.GITHUB_REPO || '',
     GITHUB_BRANCH: process.env.GITHUB_BRANCH || 'main',
+    GITHUB_AUTO_CREATE_REPO: process.env.GITHUB_AUTO_CREATE_REPO === 'true',
+    hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY,
+    hasGithubToken: !!process.env.GITHUB_TOKEN,
   };
 }
 
-// .env 파일에 변경사항 반영. 마스킹된 값(••••)은 무시 (변경 안 함).
+// .env 파일에 변경사항 반영
+// 시크릿 키(API_KEY, TOKEN)의 빈 문자열은 "변경 안 함"으로 처리
 export async function saveSettings(updates: AppSettings): Promise<void> {
   const cleanUpdates: Record<string, string> = {};
 
   for (const [key, value] of Object.entries(updates)) {
     if (!MANAGED_KEYS.includes(key as ManagedKey)) continue;
     if (typeof value !== 'string') continue;
-    if (value === MASK || value.includes('•')) continue; // 마스킹 그대로 → 변경 안 함
+    // 시크릿이 빈 문자열로 들어오면 기존 값 보존
+    if (SECRET_KEYS.has(key) && value === '') continue;
     cleanUpdates[key] = value;
   }
 
-  // 현재 .env 읽기
   let content = '';
   try {
     content = await fs.readFile(envPath(), 'utf-8');
-  } catch {
-    // 없으면 새로 만듦
-  }
+  } catch {}
 
   const lines = content.split('\n');
   const seen = new Set<string>();
 
-  // 기존 키는 in-place 교체
   const newLines = lines.map((line) => {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) return line;
@@ -80,15 +93,10 @@ export async function saveSettings(updates: AppSettings): Promise<void> {
     return line;
   });
 
-  // 새 키는 끝에 append
   for (const [key, value] of Object.entries(cleanUpdates)) {
-    if (!seen.has(key)) {
-      newLines.push(`${key}=${value}`);
-    }
+    if (!seen.has(key)) newLines.push(`${key}=${value}`);
   }
 
   await fs.writeFile(envPath(), newLines.join('\n'), 'utf-8');
-
-  // process.env에도 즉시 반영
   Object.assign(process.env, cleanUpdates);
 }
