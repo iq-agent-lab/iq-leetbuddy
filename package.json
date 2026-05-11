@@ -72,13 +72,23 @@
     },
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }],
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "artifactName": "${productName}-${version}-windows-x64.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "iq-leetbuddy"
     },
     "linux": {
       "target": ["AppImage"],
       "icon": "build/icon.png",
       "category": "Development",
-      "synopsis": "LeetCode 풀이 자동 정리 에이전트"
+      "synopsis": "LeetCode 풀이 자동 정리 에이전트",
+      "artifactName": "${productName}-${version}-linux-x86_64.${ext}"
     },
     "publish": null
   }
