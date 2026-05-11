@@ -53,18 +53,24 @@ export async function withRetry<T>(
 // 지원하는 입력 예시:
 //   - https://leetcode.com/problems/two-sum/
 //   - https://leetcode.com/problems/two-sum/description/
-//   - https://leetcode.com/problems/regular-expression-matching/description/?envType=...
+//   - https://leetcode.com/problems/validate-binary-search-tree/description/?envType=problem-list-v2&envId=depth-first-search
 //   - leetcode.com/problems/two-sum
-//   - two-sum
-//   - Two Sum            (공백 → dash 변환)
+//   - Symmetric Tree         (대소문자/공백 자유)
+//   - symmetric tree
+//   - SYMMETRIC-TREE
 export function parseProblemInput(input: string): string {
   const trimmed = input.trim();
 
-  // URL 패턴 매칭 - leetcode.com 또는 leetcode.cn, http(s) 선택, www 선택
+  // URL 패턴 매칭 - leetcode.com/cn, http(s) 선택, query/path 뒤는 무시
   const urlPattern = /leetcode\.(?:com|cn)\/problems\/([a-zA-Z0-9-]+)/i;
   const urlMatch = trimmed.match(urlPattern);
   if (urlMatch) return urlMatch[1].toLowerCase();
 
-  // 이미 slug 형태이거나 자유 텍스트
-  return trimmed.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '');
+  // 자유 텍스트 → slug 정규화
+  return trimmed
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-')        // 공백/언더스코어 → dash
+    .replace(/[^a-z0-9-]/g, '')     // 영숫자/dash만 남김
+    .replace(/-+/g, '-')            // 연속 dash 하나로
+    .replace(/^-+|-+$/g, '');       // 양끝 dash 제거
 }

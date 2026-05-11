@@ -1,7 +1,7 @@
 // Electron 메인 프로세스: 윈도우 + 트레이 + 생명주기 관리
 // 트레이 아이콘에 상주, 클릭으로 토글
 
-import { app, BrowserWindow, Tray, Menu, nativeImage } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, screen } from 'electron';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { registerIpcHandlers } from './ipc';
@@ -14,9 +14,20 @@ let tray: Tray | null = null;
 let isQuitting = false;
 
 function createWindow() {
+  // 화면 크기에 비례한 동적 디폴트
+  // - 너비: 화면의 55% (단, 1100 상한)
+  // - 높이: 화면의 92% (단, 1100 상한)
+  // 30인치급 모니터: LeetCode 옆에 띄우기 좋은 폭
+  // 14인치 맥북: 자연스럽게 작아짐
+  const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
+  const winWidth = Math.min(1100, Math.max(840, Math.floor(sw * 0.55)));
+  const winHeight = Math.min(1100, Math.max(800, Math.floor(sh * 0.92)));
+
   mainWindow = new BrowserWindow({
-    width: 780,
-    height: 900,
+    width: winWidth,
+    height: winHeight,
+    minWidth: 720,
+    minHeight: 600,
     show: false,
     title: 'iq-leetbuddy',
     backgroundColor: '#0f0e0d',
