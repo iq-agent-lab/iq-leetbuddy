@@ -97,8 +97,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "iq-leetbuddy"
+      "shortcutName": "iq-leetbuddy",
+      "artifactName": "${productName}-${version}-windows-x64.${ext}"
     },
+
     "linux": {
       "target": [
         "AppImage"
