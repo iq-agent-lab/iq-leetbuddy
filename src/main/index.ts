@@ -1,7 +1,7 @@
 // Electron 메인 프로세스: 윈도우 + 트레이 + 생명주기 관리
 // 트레이 아이콘에 상주, 클릭으로 토글
 
-import { app, BrowserWindow, Tray, Menu, nativeImage, screen } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, screen, globalShortcut } from 'electron';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { registerIpcHandlers } from './ipc';
@@ -60,6 +60,23 @@ function createWindow() {
   }
 }
 
+// 강제 활성화 - 다른 앱에서 단축키로 호출될 때 / 트레이 메뉴에서 호출될 때
+function showAndFocus() {
+  if (!mainWindow) {
+    createWindow();
+    const win = mainWindow as BrowserWindow | null;
+    win?.once('ready-to-show', () => {
+      win?.show();
+      win?.focus();
+      if (process.platform === 'darwin') app.focus({ steal: true });
+    });
+    return;
+  }
+  if (!mainWindow.isVisible()) mainWindow.show();
+  mainWindow.focus();
+  if (process.platform === 'darwin') app.focus({ steal: true });
+}
+
 function toggleWindow() {
   if (!mainWindow) {
     createWindow();
@@ -70,8 +87,7 @@ function toggleWindow() {
   if (mainWindow.isVisible() && mainWindow.isFocused()) {
     mainWindow.hide();
   } else {
-    mainWindow.show();
-    mainWindow.focus();
+    showAndFocus();
   }
 }
 
@@ -87,12 +103,9 @@ function createTray() {
 
   const menu = Menu.buildFromTemplate([
     {
-      label: 'iq-leetbuddy 열기',
-      click: () => {
-        if (!mainWindow) createWindow();
-        mainWindow?.show();
-        mainWindow?.focus();
-      },
+      label: 'iq-leetbuddy 보이기',
+      accelerator: 'CmdOrCtrl+Shift+L',
+      click: showAndFocus,
     },
     { type: 'separator' },
     {
@@ -105,15 +118,78 @@ function createTray() {
     },
   ]);
 
-  tray.setToolTip('iq-leetbuddy');
+  tray.setToolTip('iq-leetbuddy (⌘⇧L로 어디서든 호출)');
   tray.setContextMenu(menu);
   tray.on('click', toggleWindow);
 }
 
+// macOS 표준 메뉴바 - 복붙 단축키 정상화 + leetbuddy 호출 메뉴 노출
+function createAppMenu() {
+  const isMac = process.platform === 'darwin';
+  const menu = Menu.buildFromTemplate([
+    ...(isMac
+      ? [{
+          label: 'iq-leetbuddy',
+          submenu: [
+            { role: 'about' as const },
+            { type: 'separator' as const },
+            { role: 'hide' as const },
+            { role: 'hideOthers' as const },
+            { role: 'unhide' as const },
+            { type: 'separator' as const },
+            { role: 'quit' as const },
+          ],
+        }]
+      : []),
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' as const },
+        { role: 'redo' as const },
+        { type: 'separator' as const },
+        { role: 'cut' as const },
+        { role: 'copy' as const },
+        { role: 'paste' as const },
+        { role: 'selectAll' as const },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        {
+          label: 'leetbuddy 보이기/포커스',
+          accelerator: 'CmdOrCtrl+Shift+L',
+          click: showAndFocus,
+        },
+        { type: 'separator' as const },
+        { role: 'reload' as const },
+        { role: 'toggleDevTools' as const },
+        { type: 'separator' as const },
+        { role: 'resetZoom' as const },
+        { role: 'zoomIn' as const },
+        { role: 'zoomOut' as const },
+      ],
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' as const },
+        { role: 'close' as const },
+      ],
+    },
+  ]);
+  Menu.setApplicationMenu(menu);
+}
+
 app.whenReady().then(() => {
+  createAppMenu();
   createWindow();
   createTray();
   registerIpcHandlers();
+
+  // 글로벌 단축키: 어떤 앱에 있든 ⌘⇧L로 leetbuddy 활성화
+  const ok = globalShortcut.register('CmdOrCtrl+Shift+L', showAndFocus);
+  if (!ok) console.warn('Global shortcut Cmd+Shift+L 등록 실패 (이미 다른 앱이 점유)');
 
   // 보여줄 준비 됐을 때 show (깜빡임 방지)
   mainWindow?.once('ready-to-show', () => {
@@ -135,4 +211,8 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
 });
