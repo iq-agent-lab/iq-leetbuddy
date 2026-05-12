@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../vendor/highlight-theme.css">
+  <link rel="stylesheet" href="../vendor/codemirror/codemirror.css">
+  <link rel="stylesheet" href="../vendor/codemirror/theme/material-darker.css">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -22,8 +24,11 @@
       </div>
     </div>
     <div class="header-actions">
-      <button class="icon-btn" id="open-leetcode-btn" title="LeetCode 열기 (로그인된 세션 유지)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      <button class="icon-btn icon-btn-leetcode" id="open-leetcode-btn" title="LeetCode 열기 (로그인된 세션 유지)">
+        <img src="https://leetcode.com/favicon.ico" alt="LeetCode" width="22" height="22">
+      </button>
+      <button class="icon-btn" id="open-stats-btn" title="풀이 통계">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       </button>
       <button class="icon-btn" id="open-settings-btn" title="설정">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -45,44 +50,50 @@
       <div class="step-body">
         <h2 class="step-title">문제 가져오기</h2>
         <p class="step-hint step-hint-lead">
-          어떤 형식이든 OK — 대소문자, 공백, <code>-</code>, <code>_</code> 모두 자동 정규화
+          URL · slug · 문제 이름 · 또는 임베드에서 — 어떤 형식이든 OK
         </p>
         <div class="recent-row hidden" id="recent-row"></div>
-        <div class="hint-grid">
-          <div class="hint-card">
-            <span class="hint-card-label">slug 그대로</span>
-            <div class="hint-card-examples">
-              <code>two-sum</code>
-              <code>symmetric-tree</code>
+        <details class="hint-details">
+          <summary class="hint-summary">
+            <span class="hint-summary-toggle">펼쳐보기</span>
+            <span class="hint-summary-text">대소문자/공백/<code>-</code>/<code>_</code> 모두 자동 정규화 — 자세한 예시</span>
+          </summary>
+          <div class="hint-grid">
+            <div class="hint-card">
+              <span class="hint-card-label">slug 그대로</span>
+              <div class="hint-card-examples">
+                <code>two-sum</code>
+                <code>symmetric-tree</code>
+              </div>
+            </div>
+            <div class="hint-card">
+              <span class="hint-card-label">문제 이름 (자유 형식)</span>
+              <div class="hint-card-examples">
+                <code>Two Sum</code>
+                <code>symmetric tree</code>
+                <code>TWO SUM</code>
+                <code>symmetric_tree</code>
+              </div>
+              <span class="hint-card-note">대소문자/공백/언더스코어 무관</span>
+            </div>
+            <div class="hint-card hint-card-wide">
+              <span class="hint-card-label">전체 URL (어떤 페이지든)</span>
+              <div class="hint-card-examples hint-card-examples-stacked">
+                <code>https://leetcode.com/problems/two-sum/</code>
+                <code>https://leetcode.com/problems/.../description/?envType=...&envId=...</code>
+              </div>
+              <span class="hint-card-note">envType, envId 등 쿼리 자동 무시 — 주소창 그대로 붙여넣어도 됨</span>
+            </div>
+            <div class="hint-card hint-card-accent">
+              <span class="hint-card-label">임베드 LeetCode에서 가져오기</span>
+              <ul class="hint-card-list">
+                <li>임베드 윈도우 우하단 <strong>"→ leetbuddy로 가져오기"</strong> chip</li>
+                <li>메뉴바 <kbd>⌘⇧↩</kbd></li>
+                <li>아래 <strong>"↩ 임베드에서"</strong> 버튼</li>
+              </ul>
             </div>
           </div>
-          <div class="hint-card">
-            <span class="hint-card-label">문제 이름 (자유 형식)</span>
-            <div class="hint-card-examples">
-              <code>Two Sum</code>
-              <code>symmetric tree</code>
-              <code>TWO SUM</code>
-              <code>symmetric_tree</code>
-            </div>
-            <span class="hint-card-note">대소문자/공백/언더스코어 무관</span>
-          </div>
-          <div class="hint-card hint-card-wide">
-            <span class="hint-card-label">전체 URL (어떤 페이지든)</span>
-            <div class="hint-card-examples hint-card-examples-stacked">
-              <code>https://leetcode.com/problems/two-sum/</code>
-              <code>https://leetcode.com/problems/.../description/?envType=...&envId=...</code>
-            </div>
-            <span class="hint-card-note">envType, envId 등 쿼리 자동 무시 — 주소창 그대로 붙여넣어도 됨</span>
-          </div>
-          <div class="hint-card hint-card-accent">
-            <span class="hint-card-label">임베드 LeetCode에서 가져오기</span>
-            <ul class="hint-card-list">
-              <li>임베드 윈도우 우하단 <strong>"→ leetbuddy로 가져오기"</strong> chip</li>
-              <li>메뉴바 <kbd>⌘⇧↩</kbd></li>
-              <li>아래 <strong>"↩ 임베드에서"</strong> 버튼</li>
-            </ul>
-          </div>
-        </div>
+        </details>
         <div class="input-row">
           <div class="input-with-clear">
             <input id="problem-input" type="text" placeholder="LeetCode 문제 URL 또는 slug를 입력해주세요" autocomplete="off" spellcheck="false">
@@ -124,10 +135,13 @@
       <div class="step-body">
         <h2 class="step-title">통과한 코드 업로드</h2>
         <p class="step-hint">LeetCode에서 Accepted된 코드를 그대로 붙여넣어. AI 회고와 함께 GitHub에 올라가.</p>
-        <div class="code-editor-wrap">
-          <pre class="code-highlight-overlay" aria-hidden="true"><code id="code-highlight-content"></code></pre>
-          <textarea id="code-input" placeholder="// 여기에 통과한 코드를 붙여넣어주세요" spellcheck="false"></textarea>
+        <div id="duplicate-warning" class="duplicate-warning hidden"></div>
+        <div class="submission-pull-row">
+          <button id="fetch-submission-btn" class="secondary pull-btn" title="임베드 LeetCode 윈도우의 로그인 세션으로 이 문제의 최근 Accepted 코드 가져오기">
+            <span class="btn-content">↩ LeetCode에서 최근 통과 코드 가져오기</span>
+          </button>
         </div>
+        <div class="code-editor-wrap" id="code-editor"></div>
         <button id="upload-btn" class="primary block">
           <span class="btn-content">AI 회고 생성 후 GitHub에 업로드</span>
         </button>
@@ -148,11 +162,12 @@
   </main>
 
   <footer class="app-footer">
-    <span>iq-agent-lab · v0.4.0</span>
+    <span>iq-agent-lab · v0.5.0</span>
     <span class="footer-divider">·</span>
     <span id="config-status">설정 확인 중...</span>
     <span class="footer-divider">·</span>
     <span id="shortcut-status"></span>
+    <a id="update-available" class="update-pill hidden" target="_blank" rel="noopener" href="#"></a>
   </footer>
 
   <!-- 설정 모달 -->
@@ -160,7 +175,7 @@
     <div class="modal">
       <header class="modal-header">
         <h2>설정</h2>
-        <button class="modal-close" id="close-settings" aria-label="닫기">×</button>
+        <button type="button" class="modal-close" id="close-settings" aria-label="닫기">×</button>
       </header>
       <div class="modal-body">
         <ul class="modal-hint">
@@ -252,7 +267,70 @@
     </div>
   </div>
 
+  <!-- 풀이 통계 모달 -->
+  <div class="modal-backdrop hidden" id="stats-modal">
+    <div class="modal">
+      <header class="modal-header">
+        <h2>풀이 통계</h2>
+        <button type="button" class="modal-close" id="close-stats" aria-label="닫기">×</button>
+      </header>
+      <div class="modal-body">
+        <div id="stats-empty" class="stats-empty hidden">
+          <p>아직 풀이 기록이 없어요.</p>
+          <p class="stats-empty-hint">문제를 풀고 GitHub에 업로드하면 자동으로 누적됩니다.</p>
+        </div>
+        <div id="stats-content">
+          <!-- 요약 카드 -->
+          <div class="stats-summary">
+            <div class="stats-card">
+              <span class="stats-label">총 풀이</span>
+              <span class="stats-value" id="stats-total">0</span>
+            </div>
+            <div class="stats-card">
+              <span class="stats-label">이번 달</span>
+              <span class="stats-value" id="stats-this-month">0</span>
+            </div>
+            <div class="stats-card">
+              <span class="stats-label">최근 7일</span>
+              <span class="stats-value" id="stats-week">0</span>
+            </div>
+            <div class="stats-card">
+              <span class="stats-label">연속</span>
+              <span class="stats-value" id="stats-streak">0<span class="stats-value-unit">일</span></span>
+            </div>
+          </div>
+
+          <h3 class="stats-section-title">난이도 분포</h3>
+          <div class="stats-bars" id="stats-difficulty"></div>
+
+          <h3 class="stats-section-title">언어 분포</h3>
+          <div class="stats-bars" id="stats-language"></div>
+
+          <h3 class="stats-section-title">월별 풀이수 (최근 6개월)</h3>
+          <div class="stats-monthly" id="stats-monthly"></div>
+
+          <h3 class="stats-section-title">최근 풀이 (10개)</h3>
+          <div class="stats-recent" id="stats-recent"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="../vendor/highlight.min.js"></script>
+  <!-- CodeMirror 5 — UMD bundle. core 먼저 → modes (clike는 dart 의존성) → addons 순서 -->
+  <script src="../vendor/codemirror/codemirror.js"></script>
+  <script src="../vendor/codemirror/mode/clike.js"></script>
+  <script src="../vendor/codemirror/mode/python.js"></script>
+  <script src="../vendor/codemirror/mode/javascript.js"></script>
+  <script src="../vendor/codemirror/mode/go.js"></script>
+  <script src="../vendor/codemirror/mode/rust.js"></script>
+  <script src="../vendor/codemirror/mode/swift.js"></script>
+  <script src="../vendor/codemirror/mode/ruby.js"></script>
+  <script src="../vendor/codemirror/mode/dart.js"></script>
+  <script src="../vendor/codemirror/addon/matchbrackets.js"></script>
+  <script src="../vendor/codemirror/addon/closebrackets.js"></script>
+  <script src="../vendor/codemirror/addon/placeholder.js"></script>
+  <script src="../vendor/codemirror/addon/active-line.js"></script>
   <script src="./renderer.js"></script>
 </body>
 </html>

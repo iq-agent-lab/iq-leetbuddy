@@ -62,4 +62,31 @@ copyFile(
   'dist/vendor/highlight-theme.css'
 );
 
+// CodeMirror 5 — 코드 에디터 (통과 코드 입력란)
+// UMD bundle이라 번들러 없이 <script>로 include 가능
+// dist/vendor/codemirror/ 구조:
+//   codemirror.js + codemirror.css (core)
+//   theme/material-darker.css (dark 테마)
+//   mode/<lang>.js (각 언어 syntax)
+//   addon/edit/matchbrackets.js + closebrackets.js
+//   addon/display/placeholder.js
+const cmRoot = 'node_modules/codemirror';
+copyFile(`${cmRoot}/lib/codemirror.js`, 'dist/vendor/codemirror/codemirror.js');
+copyFile(`${cmRoot}/lib/codemirror.css`, 'dist/vendor/codemirror/codemirror.css');
+copyFile(`${cmRoot}/theme/material-darker.css`, 'dist/vendor/codemirror/theme/material-darker.css');
+
+// 언어 모드 — LeetCode에서 자주 쓰는 것 위주
+// clike: C, C++, Java, C#, Kotlin, Scala 모두 포함
+// dart는 clike 의존 → clike 먼저 로드되어야
+const cmModes = ['clike', 'python', 'javascript', 'go', 'rust', 'swift', 'ruby', 'dart'];
+for (const m of cmModes) {
+  copyFile(`${cmRoot}/mode/${m}/${m}.js`, `dist/vendor/codemirror/mode/${m}.js`);
+}
+
+// addon: 괄호 매칭, 자동 닫기, placeholder
+copyFile(`${cmRoot}/addon/edit/matchbrackets.js`, 'dist/vendor/codemirror/addon/matchbrackets.js');
+copyFile(`${cmRoot}/addon/edit/closebrackets.js`, 'dist/vendor/codemirror/addon/closebrackets.js');
+copyFile(`${cmRoot}/addon/display/placeholder.js`, 'dist/vendor/codemirror/addon/placeholder.js');
+copyFile(`${cmRoot}/addon/selection/active-line.js`, 'dist/vendor/codemirror/addon/active-line.js');
+
 console.log('Done.');

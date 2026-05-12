@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('api', {
   openLeetCode: (url?: string) => ipcRenderer.invoke('open-leetcode', url),
   getLeetCodeUrl: () => ipcRenderer.invoke('get-leetcode-url'),
   pullLeetCodeUrl: () => ipcRenderer.invoke('pull-leetcode-url'),
+  fetchSubmission: (titleSlug: string) =>
+    ipcRenderer.invoke('fetch-submission', titleSlug),
   createRepo: () => ipcRenderer.invoke('create-repo'),
   verifyGithub: () => ipcRenderer.invoke('verify-github'),
 
@@ -44,5 +46,10 @@ contextBridge.exposeInMainWorld('api', {
     const handler = (_e: unknown, html: string) => cb(html);
     ipcRenderer.on('annotate-stream', handler);
     return () => ipcRenderer.removeListener('annotate-stream', handler);
+  },
+  onUpdateAvailable: (cb: (info: { tag: string; url: string }) => void) => {
+    const handler = (_e: unknown, info: { tag: string; url: string }) => cb(info);
+    ipcRenderer.on('update-available', handler);
+    return () => ipcRenderer.removeListener('update-available', handler);
   },
 });

@@ -111,6 +111,9 @@ export interface IqApi {
   openLeetCode: (url?: string) => Promise<{ ok: boolean }>;
   getLeetCodeUrl: () => Promise<{ ok: boolean; url: string | null }>;
   pullLeetCodeUrl: () => Promise<{ ok: boolean }>;
+  fetchSubmission: (
+    titleSlug: string
+  ) => Promise<IpcResult<{ code: string; langSlug: string; langName: string }>>;
   createRepo: () => Promise<IpcResult<CreateRepoResult>>;
   verifyGithub: () => Promise<IpcResult<VerifyResult>>;
   onFetchProgress: (cb: (stage: string) => void) => () => void;
@@ -118,6 +121,7 @@ export interface IqApi {
   onPullProblem: (cb: (url: string) => void) => () => void;
   onTranslateStream: (cb: (html: string) => void) => () => void;
   onAnnotateStream: (cb: (html: string) => void) => () => void;
+  onUpdateAvailable: (cb: (info: { tag: string; url: string }) => void) => () => void;
 }
 
 declare global {

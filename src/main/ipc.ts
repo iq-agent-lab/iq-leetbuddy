@@ -5,6 +5,7 @@ import { fetchAndTranslate, annotateAndUpload } from '../services/pipeline';
 import { resetTranslatorClient } from '../services/translator';
 import { resetAnnotatorClient } from '../services/annotator';
 import { resetGithubClient, createRepoIfMissing, verifyConnection } from '../services/github';
+import { fetchRecentAcceptedSubmission } from '../services/leetcode';
 import { renderMarkdown } from '../services/markdown';
 import { getSettingsView, saveSettings, AppSettings } from './settings';
 
@@ -174,5 +175,15 @@ export function registerIpcHandlers() {
       return { ok: true };
     }
     return { ok: false };
+  });
+
+  // ── 임베드 LeetCode 세션으로 이 문제의 최근 Accepted submission 자동 가져오기 ──
+  ipcMain.handle('fetch-submission', async (_event, titleSlug: string) => {
+    try {
+      const result = await fetchRecentAcceptedSubmission(titleSlug);
+      return { ok: true, ...result };
+    } catch (err) {
+      return { ok: false, error: toErrorMessage(err) };
+    }
   });
 }

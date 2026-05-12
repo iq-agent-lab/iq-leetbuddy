@@ -12,10 +12,74 @@ function $<T extends HTMLElement = HTMLElement>(id: string): T {
 const $input = (id: string) => $<HTMLInputElement>(id);
 const $btn = (id: string) => $<HTMLButtonElement>(id);
 const $select = (id: string) => $<HTMLSelectElement>(id);
-const $ta = (id: string) => $<HTMLTextAreaElement>(id);
+
+// CodeMirror 5 — global (UMD)
+declare const CodeMirror: any;
+
+// LeetCode langSlug → CodeMirror 5 MIME mode
+// 미지원 lang은 text/plain fallback (syntax color 없음, 편집은 정상)
+const CM5_MODE: Record<string, string> = {
+  java: 'text/x-java',
+  cpp: 'text/x-c++src',
+  c: 'text/x-csrc',
+  csharp: 'text/x-csharp',
+  'c#': 'text/x-csharp',
+  kotlin: 'text/x-kotlin',
+  scala: 'text/x-scala',
+  python: 'text/x-python',
+  python3: 'text/x-python',
+  javascript: 'text/javascript',
+  typescript: 'application/typescript',
+  go: 'text/x-go',
+  golang: 'text/x-go',
+  rust: 'text/x-rustsrc',
+  swift: 'text/x-swift',
+  ruby: 'text/x-ruby',
+  dart: 'application/dart',
+};
+
+let cmEditor: any = null;
+
+function initCodeEditor(): void {
+  const container = $('code-editor');
+  if (typeof CodeMirror === 'undefined') {
+    console.warn('CodeMirror not loaded');
+    return;
+  }
+  cmEditor = CodeMirror(container, {
+    value: '',
+    mode: 'text/plain',
+    theme: 'material-darker',
+    lineNumbers: true,
+    indentUnit: 4,
+    tabSize: 4,
+    indentWithTabs: false,
+    matchBrackets: true,
+    autoCloseBrackets: true,
+    styleActiveLine: true,
+    lineWrapping: false,
+    placeholder: '// 여기에 통과한 코드를 붙여넣어주세요 (또는 위 버튼으로 자동 가져오기)',
+  });
+}
+
+function setEditorLang(slug: string | null): void {
+  if (!cmEditor) return;
+  const mode = (slug && CM5_MODE[slug.toLowerCase()]) || 'text/plain';
+  cmEditor.setOption('mode', mode);
+}
+
+function getEditorCode(): string {
+  return cmEditor ? cmEditor.getValue() : '';
+}
+
+function setEditorCode(code: string): void {
+  if (!cmEditor) return;
+  cmEditor.setValue(code);
+}
 
 // ─── progress 메시지 ─────────────────────────────────────────
 const FETCH_PROGRESS_TEXT: Record<string, string> = {
+  resolving: '문제 번호로 검색 중...',
   fetching: 'LeetCode에서 문제 가져오는 중...',
   translating: '한국어로 번역 중...',
   cached: '캐시에서 즉시 로드',
@@ -187,6 +251,198 @@ function renderRecent(): void {
   wrap.classList.remove('hidden');
 }
 
+// ─── 풀이 통계 (localStorage) ────────────────────────────────
+const SOLUTIONS_KEY = 'iq-leetbuddy:solutions';
+
+interface SolutionRecord {
+  frontendId: number;
+  title: string;
+  titleSlug: string;
+  language: string;
+  difficulty: string;
+  savedAt: number; // unix ms
+}
+
+function readSolutions(): SolutionRecord[] {
+  try {
+    const raw = localStorage.getItem(SOLUTIONS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? (arr as SolutionRecord[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function recordSolution(rec: SolutionRecord): void {
+  try {
+    const all = readSolutions();
+    // 같은 slug+language면 update (재upload 케이스) — 최신으로 갱신
+    const filtered = all.filter((s) => !(s.titleSlug === rec.titleSlug && s.language === rec.language));
+    filtered.unshift(rec);
+    localStorage.setItem(SOLUTIONS_KEY, JSON.stringify(filtered));
+  } catch {
+    // localStorage 사용 불가 환경 무시
+  }
+}
+
+function findExistingSolution(titleSlug: string, language: string): SolutionRecord | undefined {
+  return readSolutions().find((s) => s.titleSlug === titleSlug && s.language === language);
+}
+
+// step-3에 "이미 같은 언어로 풀이 있어요" 알림 표시
+// localStorage 기반 — 다른 디바이스 풀이는 못 잡지만 같은 디바이스는 정확
+function updateDuplicateWarning(): void {
+  const el = $('duplicate-warning');
+  if (!state.problem || !state.selectedLang) {
+    el.classList.add('hidden');
+    return;
+  }
+  const existing = findExistingSolution(state.problem.titleSlug, state.selectedLang);
+  if (!existing) {
+    el.classList.add('hidden');
+    return;
+  }
+  const daysAgo = Math.floor((Date.now() - existing.savedAt) / 86400000);
+  const when = daysAgo === 0 ? '오늘' : daysAgo === 1 ? '어제' : `${daysAgo}일 전`;
+  el.innerHTML = `<span class="duplicate-icon">⚠</span><span><strong>${escapeHtml(state.selectedLang)}</strong>로 ${when} 풀이를 이미 올렸어요. 업로드하면 회고가 새로 생성되고 같은 폴더의 코드/회고가 갱신됩니다.<br><span class="duplicate-sub">— 의도된 동작이면 그대로 진행해주세요.</span></span>`;
+  el.classList.remove('hidden');
+}
+
+// ─── 통계 dashboard 렌더링 ───────────────────────────────────
+function ymKey(ts: number): string {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function ymdKey(ts: number): string {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// 연속 풀이 일수 (오늘 또는 어제부터 거꾸로 카운트)
+function computeStreak(solutions: SolutionRecord[]): number {
+  if (solutions.length === 0) return 0;
+  const days = new Set(solutions.map((s) => ymdKey(s.savedAt)));
+  let streak = 0;
+  const now = new Date();
+  // 오늘부터 시작 — 오늘이 없으면 어제부터 (시간대 보정 없이 단순)
+  const start = days.has(ymdKey(now.getTime())) ? now : new Date(now.getTime() - 86400000);
+  for (let i = 0; ; i++) {
+    const d = new Date(start.getTime() - i * 86400000);
+    if (days.has(ymdKey(d.getTime()))) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+function renderBarRow(label: string, count: number, max: number, extraClass = ''): string {
+  const pct = max > 0 ? Math.round((count / max) * 100) : 0;
+  return `<div class="stats-bar-row">
+    <span class="stats-bar-label">${escapeHtml(label)}</span>
+    <div class="stats-bar-track"><div class="stats-bar-fill ${extraClass}" style="width: ${pct}%"></div></div>
+    <span class="stats-bar-count">${count}</span>
+  </div>`;
+}
+
+function renderStatsDashboard(): void {
+  const solutions = readSolutions();
+  const empty = $('stats-empty');
+  const content = $('stats-content');
+
+  if (solutions.length === 0) {
+    empty.classList.remove('hidden');
+    content.classList.add('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  content.classList.remove('hidden');
+
+  // 요약
+  $('stats-total').textContent = String(solutions.length);
+
+  const now = new Date();
+  const thisYM = ymKey(now.getTime());
+  const sevenDaysAgo = now.getTime() - 7 * 86400000;
+  $('stats-this-month').textContent = String(solutions.filter((s) => ymKey(s.savedAt) === thisYM).length);
+  $('stats-week').textContent = String(solutions.filter((s) => s.savedAt >= sevenDaysAgo).length);
+  const streakValueEl = $('stats-streak');
+  // streak는 숫자 + "일" suffix — innerHTML로 unit span 유지
+  streakValueEl.innerHTML = `${computeStreak(solutions)}<span class="stats-value-unit">일</span>`;
+
+  // 난이도 분포
+  const diffOrder = ['Easy', 'Medium', 'Hard'];
+  const diffClass: Record<string, string> = { Easy: 'easy', Medium: 'medium', Hard: 'hard' };
+  const diffCounts: Record<string, number> = { Easy: 0, Medium: 0, Hard: 0 };
+  for (const s of solutions) {
+    if (diffCounts[s.difficulty] !== undefined) diffCounts[s.difficulty]++;
+  }
+  const maxDiff = Math.max(...Object.values(diffCounts), 1);
+  $('stats-difficulty').innerHTML = diffOrder
+    .map((d) => renderBarRow(d, diffCounts[d], maxDiff, diffClass[d]))
+    .join('');
+
+  // 언어 분포 (사용 언어만, 카운트 내림차순)
+  const langCounts: Record<string, number> = {};
+  for (const s of solutions) {
+    langCounts[s.language] = (langCounts[s.language] || 0) + 1;
+  }
+  const sortedLangs = Object.entries(langCounts).sort((a, b) => b[1] - a[1]);
+  const maxLang = sortedLangs.length > 0 ? sortedLangs[0][1] : 1;
+  $('stats-language').innerHTML = sortedLangs.map(([l, c]) => renderBarRow(l, c, maxLang)).join('');
+
+  // 월별 (최근 6개월)
+  const months: { ym: string; label: string }[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const label = `${d.getMonth() + 1}월`;
+    months.push({ ym, label });
+  }
+  const monthCounts: Record<string, number> = {};
+  for (const s of solutions) {
+    monthCounts[ymKey(s.savedAt)] = (monthCounts[ymKey(s.savedAt)] || 0) + 1;
+  }
+  const maxMonth = Math.max(...months.map((m) => monthCounts[m.ym] || 0), 1);
+  $('stats-monthly').innerHTML = months
+    .map((m) => {
+      const c = monthCounts[m.ym] || 0;
+      const pct = (c / maxMonth) * 100;
+      return `<div class="stats-month-col">
+        <span class="stats-month-count">${c > 0 ? c : ''}</span>
+        <div class="stats-month-bar-wrap"><div class="stats-month-bar" style="height: ${pct}%"></div></div>
+        <span class="stats-month-label">${m.label}</span>
+      </div>`;
+    })
+    .join('');
+
+  // 최근 풀이 10개 (이미 unshift로 최신 우선)
+  const recent = solutions.slice(0, 10);
+  $('stats-recent').innerHTML = recent
+    .map((s) => {
+      const date = ymdKey(s.savedAt);
+      return `<div class="stats-recent-row">
+        <span class="stats-recent-id">#${s.frontendId}</span>
+        <span class="stats-recent-title" title="${escapeHtml(s.title)}">${escapeHtml(s.title)}</span>
+        <span class="stats-recent-lang">${escapeHtml(s.language)}</span>
+        <span class="stats-recent-date">${date}</span>
+      </div>`;
+    })
+    .join('');
+}
+
+function openStats(): void {
+  renderStatsDashboard();
+  $('stats-modal').classList.remove('hidden');
+}
+
+function closeStats(): void {
+  $('stats-modal').classList.add('hidden');
+}
+
 // ─── 마지막 선택 언어 기억 ───────────────────────────────────
 const PREFERRED_LANG_KEY = 'iq-leetbuddy:preferred-lang';
 
@@ -248,6 +504,7 @@ function populateLanguageSelect(snippets: CodeSnippetLite[] | undefined): void {
   state.selectedLang = defaultSlug;
 
   updateStarterCode();
+  setEditorLang(defaultSlug);
   $('starter-block').classList.remove('hidden');
 }
 
@@ -283,9 +540,23 @@ const NO_SNIPPET_MESSAGE = `// 이 언어의 시작 코드가 LeetCode에 등록
 
 // 마크다운 렌더링된 영역(번역/회고)의 pre code 블록들에 syntax highlighting 적용.
 // streaming 중 매 청크마다 호출하면 부하 — final HTML 교체 시점에만 한 번 호출.
+//
+// 회고 prompt에서 ```${language}로 코드 펜스 — language는 LeetCode langSlug
+// (예: python3, golang, csharp 등). marked가 그대로 class="language-python3"
+// 붙이지만 hljs는 'python3' 모름 → 아무 색도 안 입혀짐 (plain text 표시).
+// HLJS_LANG_MAP으로 langSlug → hljs 표준 lang으로 변환해야 색이 적용됨.
 function highlightCodeBlocks(container: HTMLElement | null): void {
   if (!container || !window.hljs) return;
   container.querySelectorAll<HTMLElement>('pre code').forEach((block) => {
+    const cls = block.className || '';
+    const match = cls.match(/language-(\S+)/);
+    if (match) {
+      const langSlug = match[1].toLowerCase();
+      const hlLang = HLJS_LANG_MAP[langSlug] || langSlug;
+      if (hlLang !== langSlug) {
+        block.className = cls.replace(`language-${match[1]}`, `language-${hlLang}`);
+      }
+    }
     delete block.dataset.highlighted;
     try {
       window.hljs!.highlightElement(block);
@@ -316,33 +587,7 @@ function updateStarterCode(): void {
   }
 }
 
-// 통과 코드 textarea의 hljs overlay 갱신
-function updateCodeHighlight(): void {
-  const code = $ta('code-input').value;
-  const codeEl = $('code-highlight-content');
-  // 끝 newline 처리 - textarea 마지막에 newline 없으면 overlay가 살짝 짧아짐
-  codeEl.textContent = code.endsWith('\n') ? code + ' ' : code + '\n';
-
-  if (window.hljs) {
-    const slug = state.selectedLang || 'python3';
-    const hlLang = HLJS_LANG_MAP[slug] || 'plaintext';
-    codeEl.className = `language-${hlLang}`;
-    delete codeEl.dataset.highlighted;
-    try {
-      window.hljs.highlightElement(codeEl);
-    } catch {
-      /* ignore */
-    }
-  }
-}
-
-function syncCodeScroll(): void {
-  const ta = $ta('code-input');
-  const overlay = document.querySelector<HTMLElement>('.code-highlight-overlay');
-  if (!overlay) return;
-  overlay.scrollTop = ta.scrollTop;
-  overlay.scrollLeft = ta.scrollLeft;
-}
+// (구) textarea + hljs overlay 코드는 CodeMirror 5로 대체됨 — setEditorLang 사용
 
 // ─── credential 에러 자동 모달 ───────────────────────────────
 function isCredentialError(msg: string | undefined | null): boolean {
@@ -410,6 +655,7 @@ async function handleFetch(): Promise<void> {
     populateLanguageSelect(state.problem.codeSnippets);
 
     showStep(3);
+    updateDuplicateWarning();
     pushRecent(state.problem);
 
     setStatus(`${state.problem.questionFrontendId}. ${state.problem.title} · 준비 완료`, 'ok');
@@ -469,6 +715,19 @@ function showUploadSuccess(result: UploadResultShape): void {
     </div>
   `;
   $btn('next-problem-btn').addEventListener('click', reset);
+
+  // 풀이 통계에 기록 — state에 problem/language 보존되어 있음
+  if (state.problem && state.selectedLang) {
+    recordSolution({
+      frontendId: parseInt(state.problem.questionFrontendId, 10),
+      title: state.problem.title,
+      titleSlug: state.problem.titleSlug,
+      language: state.selectedLang,
+      difficulty: state.problem.difficulty,
+      savedAt: Date.now(),
+    });
+  }
+
   setStatus('완료 · 다음 문제 가져오기 가능', 'ok');
 }
 
@@ -556,7 +815,7 @@ async function handleCreateRepo(): Promise<void> {
 async function handleUpload(): Promise<void> {
   if (!state.problem) return;
 
-  const code = $ta('code-input').value;
+  const code = getEditorCode();
   const language = state.selectedLang || 'python3';
 
   if (!code.trim()) {
@@ -583,10 +842,10 @@ function reset(): void {
   $input('problem-input').classList.remove('input-error');
   $('clear-input-btn').classList.add('hidden');
   $('paste-preview').classList.add('hidden');
-  $ta('code-input').value = '';
+  $('duplicate-warning').classList.add('hidden');
+  setEditorCode('');
   $('translation-output').innerHTML = '';
   $('starter-code').textContent = '';
-  $('code-highlight-content').textContent = '';
   $('result-output').innerHTML = '';
   ['step-2', 'step-3', 'step-4'].forEach((id) => $(id).classList.add('hidden'));
   $('starter-block').classList.add('hidden');
@@ -645,11 +904,18 @@ async function openSettings(): Promise<void> {
 
   $('pat-help-panel').classList.add('hidden');
   $('verify-result').classList.add('hidden');
-  $('settings-modal').classList.remove('hidden');
+  const modal = $('settings-modal');
+  modal.classList.remove('hidden');
+  // closeSettings에서 inline display:none 강제 추가했으면 여기서 제거
+  (modal as HTMLElement).style.display = '';
 }
 
 function closeSettings(): void {
-  $('settings-modal').classList.add('hidden');
+  const modal = $('settings-modal');
+  modal.classList.add('hidden');
+  // 일부 환경에서 transition/animation 잔재로 화면 그대로 보이는 경우 강제 hide
+  (modal as HTMLElement).style.display = 'none';
+  // 다음 open 시 .hidden 제거 + inline display 제거
 }
 
 async function saveSettings(): Promise<void> {
@@ -749,17 +1015,36 @@ async function handleVerifyGithub(): Promise<void> {
 
 // ─── parseProblemInput client (paste preview) ────────────────
 // src/util/language.ts의 parseProblemInput과 동일 로직 (renderer는 import 불가)
-function parseProblemInputClient(input: string): string {
+// 숫자 입력은 client에서 미리보기만 — 실제 해결은 main의 GraphQL 호출
+interface ClientParsed {
+  kind: 'slug' | 'numeric' | 'empty';
+  value: string;
+}
+
+function parseProblemInputClient(input: string): ClientParsed {
   const trimmed = input.trim();
+  if (!trimmed) return { kind: 'empty', value: '' };
+
+  // 숫자만 — frontendId
+  if (/^\d+$/.test(trimmed)) {
+    return { kind: 'numeric', value: trimmed };
+  }
+
+  // URL — cn 도메인도 같은 slug로 처리 (cn은 Cloudflare 직접 접근 불가, com에서 fetch)
   const urlPattern = /leetcode\.(?:com|cn)\/problems\/([a-zA-Z0-9-]+)/i;
   const urlMatch = trimmed.match(urlPattern);
-  if (urlMatch) return urlMatch[1].toLowerCase();
-  return trimmed
+  if (urlMatch) {
+    return { kind: 'slug', value: urlMatch[1].toLowerCase() };
+  }
+
+  // 자유 텍스트
+  const slug = trimmed
     .toLowerCase()
     .replace(/[\s_]+/g, '-')
     .replace(/[^a-z0-9-]/g, '')
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '');
+  return { kind: 'slug', value: slug };
 }
 
 function updatePastePreview(): void {
@@ -769,13 +1054,28 @@ function updatePastePreview(): void {
     preview.classList.add('hidden');
     return;
   }
-  const slug = parseProblemInputClient(raw);
-  if (!slug || slug === raw.toLowerCase()) {
-    preview.classList.add('hidden');
+
+  const parsed = parseProblemInputClient(raw);
+
+  // 숫자 입력 — frontendId 검색 미리 안내
+  if (parsed.kind === 'numeric') {
+    preview.innerHTML = `<span class="preview-arrow">→</span><span class="preview-slug">문제 #${parsed.value}</span> 으로 검색`;
+    preview.classList.remove('hidden');
     return;
   }
-  preview.innerHTML = `<span class="preview-arrow">→</span><span class="preview-slug">${slug}</span> 으로 정규화`;
-  preview.classList.remove('hidden');
+
+  // slug — 원본과 다르면 정규화 결과 표시
+  if (parsed.kind === 'slug') {
+    if (!parsed.value || parsed.value === raw.toLowerCase()) {
+      preview.classList.add('hidden');
+      return;
+    }
+    preview.innerHTML = `<span class="preview-arrow">→</span><span class="preview-slug">${parsed.value}</span> 으로 정규화`;
+    preview.classList.remove('hidden');
+    return;
+  }
+
+  preview.classList.add('hidden');
 }
 
 // ─── pull from embed ─────────────────────────────────────────
@@ -842,7 +1142,8 @@ $select('starter-lang-select').addEventListener('change', (e: Event) => {
   state.selectedLang = value;
   setPreferredLang(value);
   updateStarterCode();
-  updateCodeHighlight();
+  setEditorLang(value);
+  updateDuplicateWarning();
 });
 
 $btn('open-leetcode-btn').addEventListener('click', () => window.api.openLeetCode());
@@ -869,7 +1170,63 @@ $('translation-output').addEventListener('click', (e: Event) => {
 });
 
 $btn('pull-embed-btn').addEventListener('click', handlePullFromEmbed);
+
+// step-3: LeetCode 최근 Accepted submission 자동 가져오기
+async function handleFetchSubmission(): Promise<void> {
+  if (!state.problem) {
+    setStatus('먼저 문제를 가져와주세요', 'error');
+    return;
+  }
+  const btn = $btn('fetch-submission-btn');
+  const originalContent = (btn.querySelector('.btn-content') as HTMLElement)?.innerHTML || '';
+  btn.disabled = true;
+  setButtonLoading('fetch-submission-btn', 'LeetCode에서 코드 가져오는 중...');
+  setStatus('LeetCode 세션으로 최근 통과 코드 fetch...', 'busy');
+
+  try {
+    const r = await window.api.fetchSubmission(state.problem.titleSlug);
+    if (!r.ok) throw new Error(r.error);
+
+    // 받은 lang에 맞춰 select 변경 (해당 lang snippet 있어야)
+    const select = $select('starter-lang-select');
+    const options = Array.from(select.options).map((o) => o.value);
+    if (r.langSlug && options.includes(r.langSlug)) {
+      select.value = r.langSlug;
+      state.selectedLang = r.langSlug;
+      setPreferredLang(r.langSlug);
+      updateStarterCode();
+      updateDuplicateWarning();
+    }
+
+    // code 채움 + editor mode 갱신
+    setEditorCode(r.code!);
+    setEditorLang(r.langSlug || state.selectedLang);
+
+    setStatus(`✓ ${r.langName || r.langSlug} 코드 ${r.code!.split('\n').length}줄 가져왔어요 — 업로드 버튼 누르면 회고 생성`, 'ok');
+  } catch (e: any) {
+    setStatus(`가져오기 실패: ${e?.message || String(e)}`, 'error');
+  } finally {
+    btn.disabled = false;
+    const content = btn.querySelector('.btn-content') as HTMLElement | null;
+    if (content) content.innerHTML = originalContent;
+  }
+}
+
+$btn('fetch-submission-btn').addEventListener('click', handleFetchSubmission);
+$btn('open-stats-btn').addEventListener('click', openStats);
+$btn('close-stats').addEventListener('click', (e: Event) => {
+  e.stopPropagation();
+  closeStats();
+});
+$('stats-modal').addEventListener('click', (e: Event) => {
+  const target = e.target as HTMLElement | null;
+  if (target?.id === 'stats-modal') closeStats();
+});
+
 $btn('open-settings-btn').addEventListener('click', openSettings);
+// X / cancel button — bubble 허용. backdrop handler에 fallback 있어 두 번 호출되어도
+// idempotent. stopPropagation 제거가 X 안 먹던 원인이었을 수 있음 (불명확하지만
+// 명확한 fallback이 더 robust).
 $btn('close-settings').addEventListener('click', closeSettings);
 $btn('cancel-settings').addEventListener('click', closeSettings);
 $btn('save-settings').addEventListener('click', saveSettings);
@@ -880,13 +1237,24 @@ $btn('pat-help-btn').addEventListener('click', () => {
 
 $btn('verify-github-btn').addEventListener('click', handleVerifyGithub);
 
-// textarea ↔ overlay 동기화
-$ta('code-input').addEventListener('input', updateCodeHighlight);
-$ta('code-input').addEventListener('scroll', syncCodeScroll);
+// (구) textarea ↔ overlay 동기화 — CodeMirror 5로 대체됨, 별도 listener 불필요
 
+// settings-modal click handler — backdrop click + X/cancel button **fallback**
+// 별도 X/cancel listener가 어떤 이유로 동작 안 해도 (예: stopPropagation 실패,
+// listener 등록 race) 여기서 잡음. 진단 추적 + 동작 보장.
 $('settings-modal').addEventListener('click', (e: Event) => {
   const target = e.target as HTMLElement | null;
-  if (target?.id === 'settings-modal') closeSettings();
+  if (!target) return;
+  // backdrop 자체 클릭
+  if (target.id === 'settings-modal') {
+    closeSettings();
+    return;
+  }
+  // X / cancel button (또는 그 안의 child element)
+  if (target.closest('#close-settings') || target.closest('#cancel-settings')) {
+    closeSettings();
+    return;
+  }
 });
 
 document.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -897,11 +1265,15 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
   if (e.key === 'Escape' && !$('settings-modal').classList.contains('hidden')) {
     closeSettings();
   }
+  if (e.key === 'Escape' && !$('stats-modal').classList.contains('hidden')) {
+    closeStats();
+  }
 });
 
 window.addEventListener('DOMContentLoaded', () => {
   checkConfig();
   renderRecent();
+  initCodeEditor();
   $input('problem-input').focus();
 
   // 진행 상황 listeners
@@ -937,5 +1309,15 @@ window.addEventListener('DOMContentLoaded', () => {
   window.api.onAnnotateStream((html: string) => {
     const el = $('annotation-stream') as HTMLElement | null;
     if (el) el.innerHTML = html;
+  });
+
+  // 새 버전 release되면 footer에 pill 표시 — main의 checkForUpdates에서 push
+  // 클릭 시 GitHub Releases 페이지 열림 (target="_blank"라 main 윈도우 navigate 가로채기 X)
+  window.api.onUpdateAvailable((info: { tag: string; url: string }) => {
+    const el = $('update-available') as HTMLAnchorElement;
+    el.textContent = `↗ ${info.tag} 사용 가능`;
+    el.href = info.url;
+    el.title = `새 버전 ${info.tag} 다운로드`;
+    el.classList.remove('hidden');
   });
 });

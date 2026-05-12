@@ -1,6 +1,6 @@
 // 파이프라인 오케스트레이션
 
-import { fetchProblem } from './leetcode';
+import { fetchProblem, resolveTitleSlugByFrontendId } from './leetcode';
 import { translateProblem, StreamCallback } from './translator';
 import { annotateCode } from './annotator';
 import { uploadSolution, createRepoIfMissing } from './github';
@@ -16,7 +16,18 @@ export async function fetchAndTranslate(
   onProgress?: ProgressFn,
   onStream?: StreamCallback
 ): Promise<FetchProblemResult> {
-  const titleSlug = parseProblemInput(input);
+  const parsed = parseProblemInput(input);
+
+  // 숫자 입력 (예: "1") — frontendId → slug 해결 후 진행
+  let titleSlug = parsed.titleSlug;
+  if (parsed.isNumericId && parsed.frontendId) {
+    onProgress?.('resolving');
+    titleSlug = await resolveTitleSlugByFrontendId(parsed.frontendId);
+  }
+
+  if (!titleSlug) {
+    throw new Error('입력에서 문제 식별자를 찾지 못했어요 — URL/slug/문제 이름/번호 중 하나를 입력해주세요');
+  }
 
   // 캐시 hit 시 LLM 호출 skip — chip 재클릭 / 같은 문제 다른 언어로 풀 때 즉시 로드
   const cached = await readTranslationCache(titleSlug);

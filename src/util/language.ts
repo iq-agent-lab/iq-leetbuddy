@@ -78,28 +78,54 @@ export async function withRetry<T>(
   throw lastError;
 }
 
-// LeetCode 입력 파싱: URL (모든 형태), slug, 문제 이름까지 지원
+// LeetCode 입력 파싱: URL (모든 형태), slug, 문제 이름, 문제 번호 지원
 // 지원하는 입력 예시:
 //   - https://leetcode.com/problems/two-sum/
 //   - https://leetcode.com/problems/two-sum/description/
-//   - https://leetcode.com/problems/validate-binary-search-tree/description/?envType=problem-list-v2&envId=depth-first-search
+//   - https://leetcode.com/problems/regular-expression-matching/description/?envType=problem-list-v2&envId=depth-first-search
 //   - leetcode.com/problems/two-sum
+//   - leetcode.cn/problems/two-sum         (cn은 Cloudflare 보호로 직접 GraphQL 접근 불가 →
+//                                            com에서 같은 slug로 fetch. 대부분 com/cn slug 공유.
+//                                            cn-only 문제는 404)
 //   - Symmetric Tree         (대소문자/공백 자유)
 //   - symmetric tree
 //   - SYMMETRIC-TREE
-export function parseProblemInput(input: string): string {
+//   - 1, 2024                (숫자만이면 frontendId — leetcode.ts에서 별도 해결)
+export interface ParsedInput {
+  /** 정규화된 slug. 숫자 입력이면 빈 문자열 + isNumericId=true */
+  titleSlug: string;
+  /** 입력이 숫자만인 경우 (예: "1") — main 측에서 GraphQL로 frontendId → slug 해결 */
+  isNumericId: boolean;
+  /** isNumericId일 때 원본 숫자 (예: "1") */
+  frontendId: string | null;
+}
+
+export function parseProblemInput(input: string): ParsedInput {
   const trimmed = input.trim();
 
-  // URL 패턴 매칭 - leetcode.com/cn, http(s) 선택, query/path 뒤는 무시
+  // 숫자만 — frontendId로 해결 (예: "1", "2024")
+  if (/^\d+$/.test(trimmed)) {
+    return { titleSlug: '', isNumericId: true, frontendId: trimmed };
+  }
+
+  // URL 패턴 매칭 — leetcode.com/cn, http(s) 선택, query/path 뒤는 무시
+  // cn 도메인도 같은 slug로 처리 (com에서 fetch — cn은 Cloudflare 직접 접근 불가)
   const urlPattern = /leetcode\.(?:com|cn)\/problems\/([a-zA-Z0-9-]+)/i;
   const urlMatch = trimmed.match(urlPattern);
-  if (urlMatch) return urlMatch[1].toLowerCase();
+  if (urlMatch) {
+    return {
+      titleSlug: urlMatch[1].toLowerCase(),
+      isNumericId: false,
+      frontendId: null,
+    };
+  }
 
   // 자유 텍스트 → slug 정규화
-  return trimmed
+  const slug = trimmed
     .toLowerCase()
     .replace(/[\s_]+/g, '-')        // 공백/언더스코어 → dash
     .replace(/[^a-z0-9-]/g, '')     // 영숫자/dash만 남김
     .replace(/-+/g, '-')            // 연속 dash 하나로
     .replace(/^-+|-+$/g, '');       // 양끝 dash 제거
+  return { titleSlug: slug, isNumericId: false, frontendId: null };
 }
