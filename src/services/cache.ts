@@ -12,19 +12,16 @@ function cacheDir(): string {
   return path.join(app.getPath('userData'), 'cache', 'translations');
 }
 
-function cachePath(titleSlug: string, isCN: boolean): string {
+function cachePath(titleSlug: string): string {
   // titleSlug는 영숫자/dash만 (parseProblemInput에서 보장) — path traversal 안전
-  // cn 도메인은 별도 캐시 — 같은 slug라도 com/cn 번역이 다를 수 있음 (정책상 com 원문 우선)
-  const prefix = isCN ? 'cn-' : '';
-  return path.join(cacheDir(), `${prefix}${titleSlug}.json`);
+  return path.join(cacheDir(), `${titleSlug}.json`);
 }
 
 export async function readTranslationCache(
-  titleSlug: string,
-  isCN = false
+  titleSlug: string
 ): Promise<FetchProblemResult | null> {
   try {
-    const data = await fs.readFile(cachePath(titleSlug, isCN), 'utf-8');
+    const data = await fs.readFile(cachePath(titleSlug), 'utf-8');
     const parsed = JSON.parse(data);
     // 최소 형태 검증 — 캐시 schema 변경 시 자동으로 invalidate
     if (!parsed.problem || !parsed.translation || !parsed.translationHtml) {
@@ -39,13 +36,12 @@ export async function readTranslationCache(
 
 export async function writeTranslationCache(
   titleSlug: string,
-  result: FetchProblemResult,
-  isCN = false
+  result: FetchProblemResult
 ): Promise<void> {
   try {
     await fs.mkdir(cacheDir(), { recursive: true });
     await fs.writeFile(
-      cachePath(titleSlug, isCN),
+      cachePath(titleSlug),
       JSON.stringify(result, null, 2),
       'utf-8'
     );

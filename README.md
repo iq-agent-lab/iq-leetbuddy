@@ -145,7 +145,7 @@ iq-leetbuddy는 *commit*이 아니라 *학습*을 자동화한다.
 ✓ https://leetcode.com/problems/two-sum/
 ✓ https://leetcode.com/problems/two-sum/description/
 ✓ https://leetcode.com/problems/regular-expression-matching/description/?envType=problem-list-v2&envId=depth-first-search
-✓ leetcode.cn/problems/two-sum      ← cn URL은 cn GraphQL endpoint 사용
+✓ leetcode.cn/problems/two-sum      ← cn URL도 인식 (com에서 같은 slug로 fetch — cn은 Cloudflare 직접 접근 불가)
 ✓ Two Sum
 ✓ symmetric tree
 ✓ TWO_SUM
@@ -400,7 +400,7 @@ iq-leetbuddy/
 - [x] Renderer TypeScript 마이그레이션 (main↔renderer 비대칭 해소)
 - [x] **OS keychain 통합** — Electron `safeStorage`로 시크릿 암호화 (macOS Keychain / Windows DPAPI / Linux libsecret) + 첫 부팅 시 평문 .env 자동 마이그레이션
 - [x] **문제 번호로 검색** — `1`, `2024` 입력 시 LeetCode GraphQL로 titleSlug 자동 해결
-- [x] **leetcode.cn 지원** — cn URL 입력 시 cn GraphQL endpoint 사용 + 별도 cache key
+- [x] **leetcode.cn URL 인식** — cn URL도 받음 (com에서 같은 slug로 fetch. cn은 Cloudflare bot protection으로 직접 접근 불가, cn-only 문제만 fail)
 - [x] **풀이 레포 root README 자동 인덱스** — marker 영역에 표 갱신, 사용자 자유 텍스트 보존
 
 ### v0.5 (다음)

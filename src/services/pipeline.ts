@@ -20,10 +20,9 @@ export async function fetchAndTranslate(
 
   // 숫자 입력 (예: "1") — frontendId → slug 해결 후 진행
   let titleSlug = parsed.titleSlug;
-  const isCN = parsed.isCN;
   if (parsed.isNumericId && parsed.frontendId) {
     onProgress?.('resolving');
-    titleSlug = await resolveTitleSlugByFrontendId(parsed.frontendId, isCN);
+    titleSlug = await resolveTitleSlugByFrontendId(parsed.frontendId);
   }
 
   if (!titleSlug) {
@@ -31,15 +30,14 @@ export async function fetchAndTranslate(
   }
 
   // 캐시 hit 시 LLM 호출 skip — chip 재클릭 / 같은 문제 다른 언어로 풀 때 즉시 로드
-  // cn 도메인은 별도 캐시 키 (com/cn 번역 다를 수 있음)
-  const cached = await readTranslationCache(titleSlug, isCN);
+  const cached = await readTranslationCache(titleSlug);
   if (cached) {
     onProgress?.('cached');
     return cached;
   }
 
   onProgress?.('fetching');
-  const problem = await fetchProblem(titleSlug, isCN);
+  const problem = await fetchProblem(titleSlug);
 
   onProgress?.('translating');
   const translation = await translateProblem(problem, onStream);
@@ -47,7 +45,7 @@ export async function fetchAndTranslate(
 
   const result = { problem, translation, translationHtml };
   // 캐시 쓰기 실패해도 흐름엔 영향 X — fire-and-forget OK이지만 await로 순서 보장
-  await writeTranslationCache(titleSlug, result, isCN);
+  await writeTranslationCache(titleSlug, result);
   return result;
 }
 

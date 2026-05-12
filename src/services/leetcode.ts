@@ -1,16 +1,15 @@
 // LeetCode GraphQL 공개 엔드포인트로 문제 메타 fetch
 // 로그인 불필요 (공개 데이터만 사용)
 //
-// 도메인 분기:
-//   - leetcode.com: 영어 원문, 본 도구 default
-//   - leetcode.cn: 중국어 번역 + 일부 cn-only 문제. URL이 cn이면 cn endpoint 사용
-//     본 도구는 영어 원문을 한국어로 번역하므로 com이 적합하지만, 사용자가
-//     cn URL을 붙여넣은 경우 cn에서 정확히 동일 slug 찾기 위해 분기.
+// leetcode.com vs leetcode.cn:
+//   leetcode.cn은 Cloudflare bot protection 뒤에 있어 단순 GraphQL 접근 시 HTTP 403
+//   ("Just a moment...") 반환. 우회하려면 브라우저 JS challenge 통과 필요 → 복잡.
+//   → cn URL을 받아도 com endpoint로 fetch. 대부분 문제가 com/cn slug 공유하므로 동작.
+//   cn-only 문제(매우 드물게)는 404로 fail.
 
 import { LeetCodeProblem } from '../types';
 
-const GRAPHQL_URL_COM = 'https://leetcode.com/graphql/';
-const GRAPHQL_URL_CN = 'https://leetcode.cn/graphql/';
+const GRAPHQL_URL = 'https://leetcode.com/graphql/';
 
 const QUESTION_QUERY = `
 query questionData($titleSlug: String!) {
@@ -45,22 +44,14 @@ query problemsetQuestionList($filters: QuestionListFilterInput) {
 }
 `;
 
-function pickEndpoint(isCN: boolean): { url: string; refererBase: string } {
-  return isCN
-    ? { url: GRAPHQL_URL_CN, refererBase: 'https://leetcode.cn' }
-    : { url: GRAPHQL_URL_COM, refererBase: 'https://leetcode.com' };
-}
-
 async function graphqlRequest(
-  isCN: boolean,
   body: object,
   titleSlugForReferer?: string
 ): Promise<any> {
-  const { url, refererBase } = pickEndpoint(isCN);
   const referer = titleSlugForReferer
-    ? `${refererBase}/problems/${titleSlugForReferer}/`
-    : `${refererBase}/`;
-  const res = await fetch(url, {
+    ? `https://leetcode.com/problems/${titleSlugForReferer}/`
+    : `https://leetcode.com/`;
+  const res = await fetch(GRAPHQL_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -92,12 +83,8 @@ async function graphqlRequest(
   return json.data;
 }
 
-export async function fetchProblem(
-  titleSlug: string,
-  isCN = false
-): Promise<LeetCodeProblem> {
+export async function fetchProblem(titleSlug: string): Promise<LeetCodeProblem> {
   const data = await graphqlRequest(
-    isCN,
     { query: QUESTION_QUERY, variables: { titleSlug } },
     titleSlug
   );
@@ -111,11 +98,8 @@ export async function fetchProblem(
 
 // frontendId(예: "1") → titleSlug 해결
 // searchKeywords로 검색 후 정확히 일치하는 frontendId의 titleSlug 반환
-export async function resolveTitleSlugByFrontendId(
-  frontendId: string,
-  isCN = false
-): Promise<string> {
-  const data = await graphqlRequest(isCN, {
+export async function resolveTitleSlugByFrontendId(frontendId: string): Promise<string> {
+  const data = await graphqlRequest({
     query: SEARCH_QUERY,
     variables: { filters: { searchKeywords: frontendId } },
   });

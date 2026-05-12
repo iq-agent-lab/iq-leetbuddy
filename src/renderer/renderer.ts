@@ -284,9 +284,23 @@ const NO_SNIPPET_MESSAGE = `// 이 언어의 시작 코드가 LeetCode에 등록
 
 // 마크다운 렌더링된 영역(번역/회고)의 pre code 블록들에 syntax highlighting 적용.
 // streaming 중 매 청크마다 호출하면 부하 — final HTML 교체 시점에만 한 번 호출.
+//
+// 회고 prompt에서 ```${language}로 코드 펜스 — language는 LeetCode langSlug
+// (예: python3, golang, csharp 등). marked가 그대로 class="language-python3"
+// 붙이지만 hljs는 'python3' 모름 → 아무 색도 안 입혀짐 (plain text 표시).
+// HLJS_LANG_MAP으로 langSlug → hljs 표준 lang으로 변환해야 색이 적용됨.
 function highlightCodeBlocks(container: HTMLElement | null): void {
   if (!container || !window.hljs) return;
   container.querySelectorAll<HTMLElement>('pre code').forEach((block) => {
+    const cls = block.className || '';
+    const match = cls.match(/language-(\S+)/);
+    if (match) {
+      const langSlug = match[1].toLowerCase();
+      const hlLang = HLJS_LANG_MAP[langSlug] || langSlug;
+      if (hlLang !== langSlug) {
+        block.className = cls.replace(`language-${match[1]}`, `language-${hlLang}`);
+      }
+    }
     delete block.dataset.highlighted;
     try {
       window.hljs!.highlightElement(block);
@@ -754,27 +768,22 @@ async function handleVerifyGithub(): Promise<void> {
 interface ClientParsed {
   kind: 'slug' | 'numeric' | 'empty';
   value: string;
-  isCN: boolean;
 }
 
 function parseProblemInputClient(input: string): ClientParsed {
   const trimmed = input.trim();
-  if (!trimmed) return { kind: 'empty', value: '', isCN: false };
+  if (!trimmed) return { kind: 'empty', value: '' };
 
   // 숫자만 — frontendId
   if (/^\d+$/.test(trimmed)) {
-    return { kind: 'numeric', value: trimmed, isCN: false };
+    return { kind: 'numeric', value: trimmed };
   }
 
-  // URL
-  const urlPattern = /leetcode\.(com|cn)\/problems\/([a-zA-Z0-9-]+)/i;
+  // URL — cn 도메인도 같은 slug로 처리 (cn은 Cloudflare 직접 접근 불가, com에서 fetch)
+  const urlPattern = /leetcode\.(?:com|cn)\/problems\/([a-zA-Z0-9-]+)/i;
   const urlMatch = trimmed.match(urlPattern);
   if (urlMatch) {
-    return {
-      kind: 'slug',
-      value: urlMatch[2].toLowerCase(),
-      isCN: urlMatch[1].toLowerCase() === 'cn',
-    };
+    return { kind: 'slug', value: urlMatch[1].toLowerCase() };
   }
 
   // 자유 텍스트
@@ -784,7 +793,7 @@ function parseProblemInputClient(input: string): ClientParsed {
     .replace(/[^a-z0-9-]/g, '')
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '');
-  return { kind: 'slug', value: slug, isCN: false };
+  return { kind: 'slug', value: slug };
 }
 
 function updatePastePreview(): void {
@@ -810,8 +819,7 @@ function updatePastePreview(): void {
       preview.classList.add('hidden');
       return;
     }
-    const cnNote = parsed.isCN ? ' <span class="preview-cn">(cn)</span>' : '';
-    preview.innerHTML = `<span class="preview-arrow">→</span><span class="preview-slug">${parsed.value}</span>${cnNote} 으로 정규화`;
+    preview.innerHTML = `<span class="preview-arrow">→</span><span class="preview-slug">${parsed.value}</span> 으로 정규화`;
     preview.classList.remove('hidden');
     return;
   }
