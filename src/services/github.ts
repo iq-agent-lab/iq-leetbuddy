@@ -44,7 +44,7 @@ let _octokit: Octokit | null = null;
 function octokit(): Octokit {
   if (!_octokit) {
     if (!process.env.GITHUB_TOKEN) {
-      throw new Error('GITHUB_TOKEN이 설정되지 않았습니다 (.env 확인)');
+      throw new Error('GITHUB_TOKEN이 설정되지 않았습니다 — ⚙️ 설정에서 입력해주세요');
     }
     _octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
   }
@@ -58,6 +58,31 @@ export function resetGithubClient() {
 interface CommitFile {
   path: string;
   content: string;
+}
+
+// 기존 파일 내용과 새 content를 비교 — 같으면 commit에서 제외 가능 (git noise 회피)
+// 404 / 기타 에러 시엔 true 반환 (안전하게 새로 만듦)
+async function fileNeedsUpdate(
+  owner: string,
+  repo: string,
+  path: string,
+  newContent: string,
+  ref: string
+): Promise<boolean> {
+  try {
+    const { data } = await octokit().repos.getContent({ owner, repo, path, ref });
+    if (Array.isArray(data)) return true; // 디렉토리는 항상 update
+    if (data && 'content' in data && typeof data.content === 'string') {
+      const existing = Buffer.from(data.content, 'base64').toString('utf-8');
+      return existing.trim() !== newContent.trim();
+    }
+    return true;
+  } catch (err) {
+    const e = err as { status?: number };
+    if (e?.status === 404) return true; // 파일 없음 → 새로 만들어야 함
+    // 권한/네트워크 등 다른 에러는 commit 흐름에서 잡히도록 true 반환
+    return true;
+  }
 }
 
 async function commitFiles(
@@ -171,7 +196,7 @@ export async function uploadSolution(args: {
   const branch = process.env.GITHUB_BRANCH || 'main';
 
   if (!owner || !repo) {
-    throw new Error('GITHUB_OWNER 또는 GITHUB_REPO가 설정되지 않았습니다 (.env 확인)');
+    throw new Error('GITHUB_OWNER 또는 GITHUB_REPO가 설정되지 않았습니다 — ⚙️ 설정에서 입력해주세요');
   }
 
   const num = String(args.problem.questionFrontendId).padStart(4, '0');
@@ -179,25 +204,32 @@ export async function uploadSolution(args: {
   const ext = langToExt(args.language);
   const langDir = langToFolder(args.language);
 
-  const files: CommitFile[] = [
+  const readmePath = `${baseFolder}/README.md`;
+  const solutionPath = `${baseFolder}/${langDir}/solution.${ext}`;
+  const retroPath = `${baseFolder}/${langDir}/RETROSPECTIVE.md`;
+
+  // README는 모든 언어 풀이가 공유 — 같은 문제 다른 언어로 풀거나 같은 풀이 재upload 시
+  // 동일 내용을 매번 push하면 git history noise. 기존 sha 내용과 비교해 같으면 skip.
+  // solution / RETROSPECTIVE는 사용자 의도(개선 push)가 있을 수 있어 항상 commit.
+  const readmeChanged = await fileNeedsUpdate(owner, repo, readmePath, args.translation, branch);
+
+  const files: CommitFile[] = [];
+  if (readmeChanged) {
+    files.push({ path: readmePath, content: args.translation });
+  }
+  files.push(
     {
-      // 한국어 번역: 모든 언어 풀이가 공유 (root에 위치, 매번 갱신되지만 내용 동일)
-      path: `${baseFolder}/README.md`,
-      content: args.translation,
-    },
-    {
-      // 통과 코드: 언어별 하위 폴더
-      path: `${baseFolder}/${langDir}/solution.${ext}`,
+      path: solutionPath,
       content: args.code.endsWith('\n') ? args.code : args.code + '\n',
     },
     {
-      // AI 회고: 언어별 하위 폴더 (언어마다 다른 코드 → 다른 회고)
-      path: `${baseFolder}/${langDir}/RETROSPECTIVE.md`,
+      path: retroPath,
       content: args.annotated,
-    },
-  ];
+    }
+  );
 
-  const message = `feat: ${args.problem.questionFrontendId}. ${args.problem.title} (${langDir}) 풀이 추가`;
+  const langLabel = readmeChanged ? `(${langDir})` : `(${langDir}, README 변경 없음)`;
+  const message = `feat: ${args.problem.questionFrontendId}. ${args.problem.title} ${langLabel} 풀이 추가`;
 
   const result = await commitFiles(owner, repo, branch, files, message);
 
@@ -218,7 +250,7 @@ export async function createRepoIfMissing(): Promise<{
   const owner = process.env.GITHUB_OWNER;
   const repo = process.env.GITHUB_REPO;
   if (!owner || !repo) {
-    throw new Error('GITHUB_OWNER 또는 GITHUB_REPO가 설정되지 않았습니다');
+    throw new Error('GITHUB_OWNER 또는 GITHUB_REPO가 설정되지 않았습니다 — ⚙️ 설정에서 입력해주세요');
   }
 
   const o = octokit();
@@ -279,7 +311,7 @@ export async function verifyConnection(): Promise<{
   const branch = process.env.GITHUB_BRANCH || 'main';
 
   if (!owner || !repo) {
-    throw new Error('GITHUB_OWNER 또는 GITHUB_REPO가 설정되지 않았습니다');
+    throw new Error('GITHUB_OWNER 또는 GITHUB_REPO가 설정되지 않았습니다 — ⚙️ 설정에서 입력해주세요');
   }
 
   const o = octokit();

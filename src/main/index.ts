@@ -14,7 +14,14 @@ import {
 } from 'electron';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-import { registerIpcHandlers, setLeetCodeOpener, setShortcutGetter } from './ipc';
+import {
+  registerIpcHandlers,
+  setLeetCodeOpener,
+  setLeetCodeUrlGetter,
+  setPullCurrentLeetCodeUrl,
+  setShortcutGetter,
+} from './ipc';
+import { decryptProcessEnvSecrets, migrateSecretsIfNeeded } from './settings';
 
 // .env 로드 — 패키지 모드는 userData, dev 모드는 프로젝트 루트
 function loadEnv() {
@@ -45,6 +52,170 @@ function routeUrl(url: string) {
 }
 
 // ─── LeetCode embedded 윈도우 ──────────────────────────────
+
+// 임베드 페이지 → 메인 프로세스 통신용 sentinel
+// preload 없이 사용자 페이지 console.log를 console-message 이벤트로 캡처
+const PULL_SENTINEL = 'IQ_LEETBUDDY_PULL::';
+
+// 문제 페이지에 표시할 플로팅 버튼 주입 스크립트 (self-contained, idempotent)
+const INJECT_SCRIPT = `
+(() => {
+  if (window.__IQ_LEETBUDDY_INJECTED__) return;
+  window.__IQ_LEETBUDDY_INJECTED__ = true;
+
+  const SENTINEL = ${JSON.stringify(PULL_SENTINEL)};
+  const BTN_ID = '__iq_leetbuddy_pull_btn__';
+
+  function isProblemPage() {
+    return /\\/problems\\/[^\\/]+/.test(location.pathname);
+  }
+
+  function ensureBtn() {
+    let btn = document.getElementById(BTN_ID);
+    if (!isProblemPage()) {
+      if (btn) btn.remove();
+      return;
+    }
+    if (btn) return;
+    if (!document.body) return;
+
+    btn = document.createElement('button');
+    btn.id = BTN_ID;
+    btn.type = 'button';
+    btn.textContent = '→ leetbuddy로 가져오기';
+    btn.style.cssText = [
+      'position:fixed',
+      'bottom:24px',
+      'right:24px',
+      'z-index:2147483647',
+      'padding:10px 18px',
+      'background:linear-gradient(135deg,#cc785c,#b06547)',
+      'color:#fff',
+      'border:none',
+      'border-radius:999px',
+      'font-size:13px',
+      'font-weight:600',
+      'font-family:-apple-system,system-ui,BlinkMacSystemFont,sans-serif',
+      'letter-spacing:-0.01em',
+      'cursor:pointer',
+      'box-shadow:0 6px 20px rgba(204,120,92,0.45),inset 0 0 0 1px rgba(255,255,255,0.12)',
+      'transition:transform 0.15s ease,box-shadow 0.15s ease',
+      'user-select:none',
+      '-webkit-app-region:no-drag',
+    ].join(';');
+    btn.addEventListener('mouseenter', () => {
+      btn.style.transform = 'translateY(-1px)';
+      btn.style.boxShadow = '0 8px 24px rgba(204,120,92,0.55),inset 0 0 0 1px rgba(255,255,255,0.18)';
+    });
+    btn.addEventListener('mouseleave', () => {
+      btn.style.transform = 'translateY(0)';
+      btn.style.boxShadow = '0 6px 20px rgba(204,120,92,0.45),inset 0 0 0 1px rgba(255,255,255,0.12)';
+    });
+    btn.addEventListener('click', () => {
+      // console.log를 main 프로세스가 console-message 이벤트로 캡처
+      console.log(SENTINEL + location.href);
+      btn.textContent = '✓ leetbuddy로 보냄';
+      setTimeout(() => { btn.textContent = '→ leetbuddy로 가져오기'; }, 1600);
+    });
+    document.body.appendChild(btn);
+  }
+
+  // ─── lang hint: 메인에서 '원문' 클릭 시 hash로 전달된 lang을 안내 + 자동 선택 시도 ───
+  // LeetCode UI 변경에 fragile하므로 best-effort. 실패해도 토스트는 표시.
+  const LANG_DISPLAY = {
+    python3:'Python3', python:'Python', java:'Java',
+    cpp:'C++', c:'C', csharp:'C#',
+    javascript:'JavaScript', typescript:'TypeScript',
+    go:'Go', golang:'Go', kotlin:'Kotlin', rust:'Rust',
+    swift:'Swift', ruby:'Ruby', scala:'Scala', php:'PHP',
+    dart:'Dart', elixir:'Elixir', erlang:'Erlang',
+  };
+  const ALL_DISPLAYS = Object.values(LANG_DISPLAY);
+
+  function showLangToast(targetLang, display) {
+    const TOAST_ID = '__iq_leetbuddy_lang_toast__';
+    const existing = document.getElementById(TOAST_ID);
+    if (existing) existing.remove();
+    if (!document.body) return;
+
+    const toast = document.createElement('div');
+    toast.id = TOAST_ID;
+    toast.style.cssText = [
+      'position:fixed','top:64px','right:24px','z-index:2147483646',
+      'padding:12px 16px','background:rgba(20,18,16,0.96)','color:#fff',
+      'border-radius:10px','font-size:13px',
+      'font-family:-apple-system,system-ui,sans-serif',
+      'box-shadow:0 8px 24px rgba(0,0,0,0.5)','max-width:300px','line-height:1.55',
+      'border-left:3px solid #cc785c','transition:opacity 0.4s ease',
+    ].join(';');
+    toast.innerHTML =
+      '<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:4px;">' +
+      '<strong style="color:#cc785c;font-size:12px;letter-spacing:0.04em;">LEETBUDDY</strong>' +
+      '<span style="color:rgba(255,255,255,0.5);font-size:11px;">선택된 시작 언어</span>' +
+      '</div>' +
+      '<div style="font-size:15px;font-weight:600;margin-bottom:4px;">' + display + '</div>' +
+      '<div style="opacity:0.6;font-size:11px;">에디터 좌측 상단 lang 드롭다운에서 직접 변경 가능</div>';
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; }, 5500);
+    setTimeout(() => toast.remove(), 6000);
+  }
+
+  function trySwitchLang(display) {
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      const buttons = Array.from(document.querySelectorAll('button'));
+      let langBtn = null;
+      for (const b of buttons) {
+        const txt = (b.textContent || '').trim();
+        if (ALL_DISPLAYS.includes(txt)) { langBtn = b; break; }
+      }
+      if (!langBtn) {
+        if (attempts > 25) clearInterval(interval); // ~7.5s
+        return;
+      }
+      clearInterval(interval);
+      const current = (langBtn.textContent || '').trim();
+      if (current === display) return; // 이미 맞음
+      langBtn.click();
+      // 드롭다운 옵션 클릭 (열린 후 약간 대기)
+      setTimeout(() => {
+        const items = document.querySelectorAll('[role="option"], [role="menuitem"], li, [role="button"]');
+        for (const item of items) {
+          if ((item.textContent || '').trim() === display) {
+            item.click();
+            break;
+          }
+        }
+      }, 220);
+    }, 300);
+  }
+
+  function ensureLangHint() {
+    const m = location.hash.match(/leetbuddy-lang=([\\w-]+)/);
+    if (!m) return;
+    const targetLang = m[1].toLowerCase();
+    if (window.__IQ_LEETBUDDY_LANG__ === targetLang) return;
+    window.__IQ_LEETBUDDY_LANG__ = targetLang;
+
+    const display = LANG_DISPLAY[targetLang] || targetLang;
+    showLangToast(targetLang, display);
+    trySwitchLang(display);
+  }
+
+  // SPA navigation (history pushState) 대응: 초기 + interval 폴링
+  ensureBtn();
+  ensureLangHint();
+  setInterval(() => { ensureBtn(); ensureLangHint(); }, 1200);
+})();
+`;
+
+function injectPullButton(win: BrowserWindow) {
+  win.webContents.executeJavaScript(INJECT_SCRIPT).catch(() => {
+    // 페이지 로드 실패/접근 차단 시 무시 — 다음 navigate에서 다시 시도
+  });
+}
+
 function openLeetCodeWindow(url: string = 'https://leetcode.com/') {
   if (leetcodeWindow && !leetcodeWindow.isDestroyed()) {
     leetcodeWindow.loadURL(url);
@@ -85,6 +256,60 @@ function openLeetCodeWindow(url: string = 'https://leetcode.com/') {
     }
     return { action: 'deny' };
   });
+
+  // 페이지 로드 완료 + SPA 내부 라우팅 양쪽 모두에서 버튼 주입
+  leetcodeWindow.webContents.on('did-finish-load', () => {
+    if (leetcodeWindow) injectPullButton(leetcodeWindow);
+  });
+  leetcodeWindow.webContents.on('did-navigate-in-page', () => {
+    if (leetcodeWindow) injectPullButton(leetcodeWindow);
+  });
+
+  // 페이지 console.log에서 sentinel을 잡아서 메인으로 pull
+  // Electron 33 시그니처: (event, level, message, line, sourceId)
+  leetcodeWindow.webContents.on(
+    'console-message',
+    (_event, _level, message) => {
+      if (typeof message !== 'string') return;
+      if (!message.startsWith(PULL_SENTINEL)) return;
+      const url = message.slice(PULL_SENTINEL.length);
+      pullToMainWindow(url);
+    }
+  );
+}
+
+// 임베드 LeetCode 윈도우의 현재 URL을 메인 윈도우 input으로 밀어넣음
+// 푸시(임베드 버튼/메뉴) + 풀(메인 보조 버튼) 양방향에서 호출
+function pullToMainWindow(url: string) {
+  if (!url || !isLeetCodeUrl(url)) return;
+  if (!mainWindow) {
+    createWindow();
+    const win = mainWindow as BrowserWindow | null;
+    win?.once('ready-to-show', () => {
+      win.show();
+      // 첫 로드라면 DOM이 listener를 붙이기 전이라 메시지가 유실될 수 있음 → did-finish-load 대기
+      win.webContents.once('did-finish-load', () => {
+        win.webContents.send('pull-problem', url);
+      });
+      showAndFocus();
+    });
+    return;
+  }
+  showAndFocus();
+  mainWindow.webContents.send('pull-problem', url);
+}
+
+// 메뉴/단축키/메인 input 보조 버튼에서 공통으로 부름
+function pullCurrentLeetCodeUrl() {
+  if (!leetcodeWindow || leetcodeWindow.isDestroyed()) return;
+  const url = leetcodeWindow.webContents.getURL();
+  pullToMainWindow(url);
+}
+
+function getCurrentLeetCodeUrl(): string | null {
+  if (!leetcodeWindow || leetcodeWindow.isDestroyed()) return null;
+  const url = leetcodeWindow.webContents.getURL();
+  return isLeetCodeUrl(url) ? url : null;
 }
 
 // ─── 메인 윈도우 ──────────────────────────────
@@ -285,6 +510,11 @@ function createAppMenu() {
           label: 'LeetCode 열기',
           click: () => openLeetCodeWindow(),
         },
+        {
+          label: '임베드 LeetCode → leetbuddy 입력으로',
+          accelerator: 'CmdOrCtrl+Shift+Return',
+          click: pullCurrentLeetCodeUrl,
+        },
         { type: 'separator' as const },
         { role: 'reload' as const },
         { role: 'toggleDevTools' as const },
@@ -303,8 +533,15 @@ function createAppMenu() {
 }
 
 // ─── 부트스트랩 ──────────────────────────────
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   loadEnv(); // app.isPackaged + app.getPath('userData') 사용 가능 시점
+
+  // 시크릿(API_KEY/TOKEN)이 OS keychain encrypted면 process.env에 평문으로 복호화
+  // legacy .env의 평문 시크릿은 그대로 두고, 다음 줄의 migration이 자동으로 암호화
+  decryptProcessEnvSecrets();
+
+  // 평문 시크릿 있으면 OS keychain encrypted로 자동 마이그레이션 (best-effort)
+  await migrateSecretsIfNeeded();
 
   // macOS Dock 아이콘 명시 (개발 모드에서도 코랄 행성 보이게)
   // 패키징된 앱은 .icns가 자동 사용됨
@@ -324,6 +561,8 @@ app.whenReady().then(() => {
 
   // IPC에 의존성 주입
   setLeetCodeOpener(openLeetCodeWindow);
+  setLeetCodeUrlGetter(getCurrentLeetCodeUrl);
+  setPullCurrentLeetCodeUrl(pullCurrentLeetCodeUrl);
   setShortcutGetter(() => activeShortcut);
 
   createAppMenu();

@@ -1,10 +1,11 @@
 // 파이프라인 오케스트레이션
 
 import { fetchProblem } from './leetcode';
-import { translateProblem } from './translator';
+import { translateProblem, StreamCallback } from './translator';
 import { annotateCode } from './annotator';
 import { uploadSolution, createRepoIfMissing } from './github';
 import { renderMarkdown } from './markdown';
+import { readTranslationCache, writeTranslationCache } from './cache';
 import { parseProblemInput } from '../util/language';
 import { FetchProblemResult, UploadResult, LeetCodeProblem } from '../types';
 
@@ -12,16 +13,29 @@ export type ProgressFn = (stage: string) => void;
 
 export async function fetchAndTranslate(
   input: string,
-  onProgress?: ProgressFn
+  onProgress?: ProgressFn,
+  onStream?: StreamCallback
 ): Promise<FetchProblemResult> {
-  onProgress?.('fetching');
   const titleSlug = parseProblemInput(input);
+
+  // 캐시 hit 시 LLM 호출 skip — chip 재클릭 / 같은 문제 다른 언어로 풀 때 즉시 로드
+  const cached = await readTranslationCache(titleSlug);
+  if (cached) {
+    onProgress?.('cached');
+    return cached;
+  }
+
+  onProgress?.('fetching');
   const problem = await fetchProblem(titleSlug);
 
   onProgress?.('translating');
-  const translation = await translateProblem(problem);
+  const translation = await translateProblem(problem, onStream);
   const translationHtml = await renderMarkdown(translation);
-  return { problem, translation, translationHtml };
+
+  const result = { problem, translation, translationHtml };
+  // 캐시 쓰기 실패해도 흐름엔 영향 X — fire-and-forget OK이지만 await로 순서 보장
+  await writeTranslationCache(titleSlug, result);
+  return result;
 }
 
 export async function annotateAndUpload(
@@ -31,16 +45,19 @@ export async function annotateAndUpload(
     code: string;
     language: string;
   },
-  onProgress?: ProgressFn
-): Promise<UploadResult> {
+  onProgress?: ProgressFn,
+  onStream?: StreamCallback
+): Promise<UploadResult & { annotatedHtml: string }> {
   // 1) AI 회고 생성 (가장 비싼 단계 - 한 번만 호출)
   onProgress?.('annotating');
   const annotated = await annotateCode(
     args.problem,
     args.translation,
     args.code,
-    args.language
+    args.language,
+    onStream
   );
+  const annotatedHtml = await renderMarkdown(annotated);
 
   const uploadArgs = {
     problem: args.problem,
@@ -53,7 +70,8 @@ export async function annotateAndUpload(
   // 2) GitHub 업로드 시도
   onProgress?.('uploading');
   try {
-    return await uploadSolution(uploadArgs);
+    const result = await uploadSolution(uploadArgs);
+    return { ...result, annotatedHtml };
   } catch (err) {
     const status = (err as { status?: number })?.status;
     const autoCreate = process.env.GITHUB_AUTO_CREATE_REPO === 'true';
@@ -65,7 +83,8 @@ export async function annotateAndUpload(
       await createRepoIfMissing();
       await new Promise((r) => setTimeout(r, 1500)); // propagation 대기
       onProgress?.('uploading');
-      return uploadSolution(uploadArgs);
+      const result = await uploadSolution(uploadArgs);
+      return { ...result, annotatedHtml };
     }
     throw err;
   }
