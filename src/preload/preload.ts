@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('api', {
   saveSettings: (settings: Record<string, string>) =>
     ipcRenderer.invoke('save-settings', settings),
   openLeetCode: (url?: string) => ipcRenderer.invoke('open-leetcode', url),
+  getLeetCodeUrl: () => ipcRenderer.invoke('get-leetcode-url'),
+  pullLeetCodeUrl: () => ipcRenderer.invoke('pull-leetcode-url'),
   createRepo: () => ipcRenderer.invoke('create-repo'),
   verifyGithub: () => ipcRenderer.invoke('verify-github'),
 
@@ -27,5 +29,10 @@ contextBridge.exposeInMainWorld('api', {
     const handler = (_e: unknown, stage: string) => cb(stage);
     ipcRenderer.on('upload-progress', handler);
     return () => ipcRenderer.removeListener('upload-progress', handler);
+  },
+  onPullProblem: (cb: (url: string) => void) => {
+    const handler = (_e: unknown, url: string) => cb(url);
+    ipcRenderer.on('pull-problem', handler);
+    return () => ipcRenderer.removeListener('pull-problem', handler);
   },
 });

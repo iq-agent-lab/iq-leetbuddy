@@ -52,9 +52,13 @@
             <code>https://leetcode.com/problems/.../description/?envType=...&envId=...</code>
           </span>
           <span class="hint-note">LeetCode 어떤 페이지든 주소창 그대로 붙여넣으면 됨 (envType, envId 쿼리 자동 무시)</span>
+          <span class="hint-note">또는 임베드 LeetCode 윈도우에서 우하단 <strong>"→ leetbuddy로 가져오기"</strong> 버튼 클릭 · 메뉴바 <kbd>⌘⇧↩</kbd> · 아래 <strong>↩ 임베드에서</strong> 버튼</span>
         </p>
         <div class="input-row">
           <input id="problem-input" type="text" placeholder="LeetCode 문제 URL 또는 slug를 입력해주세요" autocomplete="off" spellcheck="false">
+          <button id="pull-embed-btn" class="secondary pull-btn" title="임베드 LeetCode 윈도우의 현재 페이지 URL을 가져와 자동 fetch (⌘⇧↩)">
+            <span class="btn-content">↩ 임베드에서</span>
+          </button>
           <button id="fetch-btn" class="primary"><span class="btn-content">불러오기</span></button>
         </div>
       </div>

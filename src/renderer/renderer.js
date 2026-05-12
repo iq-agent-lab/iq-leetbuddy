@@ -515,6 +515,28 @@ $('starter-lang-select').addEventListener('change', (e) => {
   updateCodeHighlight(); // 통과 코드도 같은 언어로 hl 갱신
 });
 $('open-leetcode-btn').addEventListener('click', () => window.api.openLeetCode());
+
+// 임베드 LeetCode 윈도우의 현재 URL을 input에 채우고 자동 fetch
+async function handlePullFromEmbed() {
+  const btn = $('pull-embed-btn');
+  btn.disabled = true;
+  try {
+    const r = await window.api.getLeetCodeUrl();
+    if (!r.ok || !r.url) {
+      setStatus('임베드 LeetCode 윈도우가 열려있지 않아요 — 헤더의 ↗ 버튼으로 먼저 열어주세요', 'error');
+      return;
+    }
+    $('problem-input').value = r.url;
+    handleFetch();
+  } catch (e) {
+    setStatus(`가져오기 실패: ${e.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$('pull-embed-btn').addEventListener('click', handlePullFromEmbed);
+
 $('open-settings-btn').addEventListener('click', openSettings);
 $('close-settings').addEventListener('click', closeSettings);
 $('cancel-settings').addEventListener('click', closeSettings);
@@ -561,5 +583,12 @@ window.addEventListener('DOMContentLoaded', () => {
     if (!text) return;
     setStatus(text, 'busy');
     setButtonLoading('upload-btn', text);
+  });
+
+  // 임베드 LeetCode 윈도우의 플로팅 버튼/메뉴/단축키에서 push된 URL 받기
+  // → input 채우고 자동 fetch (메인 윈도우가 안 보이면 main 프로세스에서 이미 showAndFocus 처리됨)
+  window.api.onPullProblem((url) => {
+    $('problem-input').value = url;
+    handleFetch();
   });
 });

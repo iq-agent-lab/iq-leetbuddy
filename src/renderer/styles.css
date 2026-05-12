@@ -273,6 +273,27 @@ html, body {
   margin-bottom: 12px;
 }
 
+/* 임베드 LeetCode → 메인 input URL pull 보조 버튼 */
+button.pull-btn {
+  flex-shrink: 0;
+  padding: 11px 14px;
+  font-size: 12px;
+  white-space: nowrap;
+  border-style: dashed;
+  letter-spacing: 0.01em;
+}
+
+button.pull-btn:hover:not(:disabled) {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--accent-soft);
+}
+
+button.pull-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 input[type="text"],
 select,
 textarea {

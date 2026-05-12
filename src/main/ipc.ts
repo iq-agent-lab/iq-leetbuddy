@@ -8,10 +8,20 @@ import { resetGithubClient, createRepoIfMissing, verifyConnection } from '../ser
 import { getSettingsView, saveSettings, AppSettings } from './settings';
 
 let leetcodeOpener: ((url?: string) => void) | null = null;
+let leetcodeUrlGetter: (() => string | null) | null = null;
+let pullCurrentUrl: (() => void) | null = null;
 let shortcutGetter: (() => string | null) | null = null;
 
 export function setLeetCodeOpener(fn: (url?: string) => void) {
   leetcodeOpener = fn;
+}
+
+export function setLeetCodeUrlGetter(fn: () => string | null) {
+  leetcodeUrlGetter = fn;
+}
+
+export function setPullCurrentLeetCodeUrl(fn: () => void) {
+  pullCurrentUrl = fn;
 }
 
 export function setShortcutGetter(fn: () => string | null) {
@@ -105,5 +115,20 @@ export function registerIpcHandlers() {
   ipcMain.handle('open-leetcode', async (_event, url?: string) => {
     if (leetcodeOpener) leetcodeOpener(url);
     return { ok: true };
+  });
+
+  // ── 임베드 LeetCode 윈도우의 현재 URL 조회 (메인 input '가져오기' 보조 버튼용) ──
+  ipcMain.handle('get-leetcode-url', async () => {
+    const url = leetcodeUrlGetter ? leetcodeUrlGetter() : null;
+    return { ok: !!url, url };
+  });
+
+  // ── 임베드 LeetCode 윈도우 URL을 메인 input으로 끌어오기 (자동 fetch 트리거) ──
+  ipcMain.handle('pull-leetcode-url', async () => {
+    if (pullCurrentUrl) {
+      pullCurrentUrl();
+      return { ok: true };
+    }
+    return { ok: false };
   });
 }
