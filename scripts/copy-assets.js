@@ -25,7 +25,7 @@ function copyDir(src, dest) {
 console.log('Copying assets...');
 copyFile('src/renderer/index.html', 'dist/renderer/index.html');
 copyFile('src/renderer/styles.css', 'dist/renderer/styles.css');
-copyFile('src/renderer/renderer.js', 'dist/renderer/renderer.js');
+// renderer.ts는 tsc가 dist/renderer/renderer.js로 컴파일 (수동 복사 불필요)
 copyDir('assets', 'dist/assets');
 
 // highlight.js vendor 파일 — CDN 안 쓰고 로컬 번들 (CSP 깔끔, 오프라인 OK)

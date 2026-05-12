@@ -4,6 +4,10 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { app } from 'electron';
+import { AppSettings, SettingsView } from '../types';
+
+// Re-export so ipc.ts can keep importing from './settings'
+export { AppSettings, SettingsView };
 
 function envPath(): string {
   // 패키지된 앱: userData 디렉토리에 저장 (asar는 read-only이므로)
@@ -28,28 +32,6 @@ const MANAGED_KEYS = [
 ] as const;
 
 type ManagedKey = (typeof MANAGED_KEYS)[number];
-
-export interface AppSettings {
-  ANTHROPIC_API_KEY?: string;
-  ANTHROPIC_MODEL?: string;
-  GITHUB_TOKEN?: string;
-  GITHUB_OWNER?: string;
-  GITHUB_REPO?: string;
-  GITHUB_BRANCH?: string;
-  GITHUB_AUTO_CREATE_REPO?: string;
-}
-
-export interface SettingsView {
-  ANTHROPIC_API_KEY: string;          // 항상 빈 문자열 (보안)
-  ANTHROPIC_MODEL: string;
-  GITHUB_TOKEN: string;                // 항상 빈 문자열 (보안)
-  GITHUB_OWNER: string;
-  GITHUB_REPO: string;
-  GITHUB_BRANCH: string;
-  GITHUB_AUTO_CREATE_REPO: boolean;
-  hasAnthropicKey: boolean;            // 저장된 키가 존재하는가?
-  hasGithubToken: boolean;
-}
 
 const SECRET_KEYS = new Set<string>(['ANTHROPIC_API_KEY', 'GITHUB_TOKEN']);
 
