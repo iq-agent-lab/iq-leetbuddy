@@ -1083,6 +1083,53 @@ textarea::-webkit-scrollbar-track {
   font-weight: 500;
 }
 
+/* ─── streaming loader & annotation stream pane ─── */
+.streaming-loader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+  padding: 14px 0;
+}
+
+.streaming-loader::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.annotation-stream {
+  margin-bottom: 16px;
+  min-height: 40px;
+}
+
+.annotation-stream.streaming {
+  border-left: 2px solid var(--accent);
+  padding-left: 14px;
+  opacity: 0.92;
+}
+
+.upload-info {
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.upload-info:empty {
+  display: none;
+  border-top: none;
+  padding-top: 0;
+}
+
 /* ─── action row inside error pane ─── */
 .action-row {
   display: flex;

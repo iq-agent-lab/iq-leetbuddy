@@ -73,20 +73,43 @@ Output: ...
 6. 마크다운 외 다른 설명/주석 추가 금지`;
 }
 
-export async function translateProblem(problem: LeetCodeProblem): Promise<string> {
+export type StreamCallback = (snapshot: string) => void;
+
+function extractText(content: Array<{ type: string }>): string {
+  return content
+    .filter((b) => b.type === 'text')
+    .map((b) => (b as { type: 'text'; text: string }).text)
+    .join('')
+    .trim();
+}
+
+export async function translateProblem(
+  problem: LeetCodeProblem,
+  onStream?: StreamCallback
+): Promise<string> {
   return withRetry(async () => {
+    if (onStream) {
+      const stream = client().messages.stream({
+        model: MODEL,
+        max_tokens: 4000,
+        messages: [{ role: 'user', content: buildPrompt(problem) }],
+      });
+      stream.on('text', (_delta, snapshot) => {
+        onStream(snapshot);
+      });
+      const final = await stream.finalMessage();
+      const text = extractText(final.content as Array<{ type: string }>);
+      if (!text) throw new Error('번역 결과가 비어있습니다');
+      return text;
+    }
+
+    // non-streaming fallback (호환 유지)
     const response = await client().messages.create({
       model: MODEL,
       max_tokens: 4000,
       messages: [{ role: 'user', content: buildPrompt(problem) }],
     });
-
-    const text = response.content
-      .filter((block) => block.type === 'text')
-      .map((block) => (block as { type: 'text'; text: string }).text)
-      .join('')
-      .trim();
-
+    const text = extractText(response.content as Array<{ type: string }>);
     if (!text) throw new Error('번역 결과가 비어있습니다');
     return text;
   });

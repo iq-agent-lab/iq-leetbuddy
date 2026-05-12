@@ -35,4 +35,14 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('pull-problem', handler);
     return () => ipcRenderer.removeListener('pull-problem', handler);
   },
+  onTranslateStream: (cb: (html: string) => void) => {
+    const handler = (_e: unknown, html: string) => cb(html);
+    ipcRenderer.on('translate-stream', handler);
+    return () => ipcRenderer.removeListener('translate-stream', handler);
+  },
+  onAnnotateStream: (cb: (html: string) => void) => {
+    const handler = (_e: unknown, html: string) => cb(html);
+    ipcRenderer.on('annotate-stream', handler);
+    return () => ipcRenderer.removeListener('annotate-stream', handler);
+  },
 });

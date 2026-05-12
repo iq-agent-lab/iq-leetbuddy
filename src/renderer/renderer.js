@@ -244,6 +244,14 @@ async function handleFetch() {
   setStatus('문제 가져오는 중...', 'busy');
   setButtonLoading('fetch-btn', '가져오는 중...');
 
+  // streaming을 받을 영역을 미리 보여줌 (step-2)
+  // starter-block은 codeSnippets 받기 전이라 hidden 유지
+  $('translation-output').innerHTML = '<div class="streaming-loader">번역 진행 중...</div>';
+  $('starter-block').classList.add('hidden');
+  $('step-3').classList.add('hidden');
+  $('step-4').classList.add('hidden');
+  showStep(2);
+
   try {
     const result = await window.api.fetchProblem(input);
     if (!result.ok) throw new Error(result.error);
@@ -251,16 +259,19 @@ async function handleFetch() {
     state.problem = result.problem;
     state.translation = result.translation;
 
+    // streaming 끝났으니 최종 (안정적인) HTML로 교체
     $('translation-output').innerHTML = result.translationHtml;
     populateLanguageSelect(result.problem.codeSnippets);
 
-    showStep(2);
     showStep(3);
 
     setStatus(`${state.problem.questionFrontendId}. ${state.problem.title} · 준비 완료`, 'ok');
   } catch (e) {
     setStatus(`에러: ${e.message}`, 'error');
     flashInputError();
+    // 에러 시 step-2 다시 숨김 (사용자가 다시 시도하면 streaming 영역 새로)
+    $('step-2').classList.add('hidden');
+    $('translation-output').innerHTML = '';
   } finally {
     resetButton('fetch-btn', '불러오기');
   }
@@ -270,10 +281,28 @@ function escapeHtml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function showUploadSuccess(result) {
+// step-4 result-pane을 stream(상단) + info(하단) 두 영역으로 초기화
+// handleUpload 시작 시 호출 — 회고 streaming이 들어갈 자리 마련
+function initResultPane() {
   const out = $('result-output');
   out.classList.remove('error');
   out.innerHTML = `
+    <div id="annotation-stream" class="annotation-stream md-rendered streaming">
+      <div class="streaming-loader">AI 회고 작성 중...</div>
+    </div>
+    <div id="upload-info" class="upload-info"></div>
+  `;
+}
+
+function showUploadSuccess(result) {
+  // streaming 끝났으니 final HTML로 한 번 더 교체 (incomplete markdown 클린업)
+  const stream = $('annotation-stream');
+  if (stream && result.annotatedHtml) {
+    stream.innerHTML = result.annotatedHtml;
+    stream.classList.remove('streaming'); // 좌측 코랄 라인 제거
+  }
+
+  $('upload-info').innerHTML = `
     <strong>✓ 업로드 완료</strong>
     <div class="result-row"><span class="result-label">폴더</span><code class="inline-mono">${result.folder}</code></div>
     <div class="result-row"><span class="result-label">커밋</span><a href="${result.commitUrl}" target="_blank" rel="noopener">${result.commitSha.slice(0, 7)}</a></div>
@@ -284,11 +313,11 @@ function showUploadSuccess(result) {
     </div>
   `;
   $('next-problem-btn').addEventListener('click', reset);
-  showStep(4);
   setStatus('완료 · 다음 문제 가져오기 가능', 'ok');
 }
 
 function showRepoMissingError(message) {
+  // 에러는 result-output 통째로 교체 (회고 partial은 사라지지만 에러가 우선)
   const out = $('result-output');
   out.classList.add('error');
   out.innerHTML = `
@@ -320,6 +349,10 @@ function showErrorPlain(message) {
 async function performUpload() {
   setStatus('AI 회고 작성 중...', 'busy');
   setButtonLoading('upload-btn', 'AI 회고 작성 중...');
+
+  // step-4 미리 보여줌 — annotation-stream에 streaming 텍스트가 점진 채워짐
+  initResultPane();
+  showStep(4);
 
   try {
     const result = await window.api.uploadSolution(state.lastUploadPayload);
@@ -719,5 +752,18 @@ window.addEventListener('DOMContentLoaded', () => {
     $('clear-input-btn').classList.remove('hidden');
     updatePastePreview();
     handleFetch();
+  });
+
+  // 번역 streaming: main에서 throttle된 HTML이 들어옴 → translation-output 점진 갱신
+  window.api.onTranslateStream((html) => {
+    const el = $('translation-output');
+    if (el) el.innerHTML = html;
+  });
+
+  // 회고 streaming: annotation-stream 점진 갱신
+  // step-4가 hidden이거나 error로 result-output이 통째로 교체된 상태면 el이 null → skip
+  window.api.onAnnotateStream((html) => {
+    const el = $('annotation-stream');
+    if (el) el.innerHTML = html;
   });
 });
