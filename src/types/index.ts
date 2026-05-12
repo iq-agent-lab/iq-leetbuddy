@@ -111,6 +111,9 @@ export interface IqApi {
   openLeetCode: (url?: string) => Promise<{ ok: boolean }>;
   getLeetCodeUrl: () => Promise<{ ok: boolean; url: string | null }>;
   pullLeetCodeUrl: () => Promise<{ ok: boolean }>;
+  fetchSubmission: (
+    titleSlug: string
+  ) => Promise<IpcResult<{ code: string; langSlug: string; langName: string }>>;
   createRepo: () => Promise<IpcResult<CreateRepoResult>>;
   verifyGithub: () => Promise<IpcResult<VerifyResult>>;
   onFetchProgress: (cb: (stage: string) => void) => () => void;

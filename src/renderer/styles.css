@@ -116,13 +116,13 @@ html, body {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-muted);
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -130,6 +130,26 @@ html, body {
 .icon-btn:hover {
   border-color: var(--accent);
   color: var(--accent-soft);
+  background: rgba(204, 120, 92, 0.04);
+}
+
+.icon-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* LeetCode 버튼은 로고 이미지 — currentColor 영향 없음, hover 시 border만 변화 */
+.icon-btn-leetcode img {
+  width: 22px;
+  height: 22px;
+  display: block;
+  /* favicon이 검은 배경 + 노랑 L. dark UI에 자연스럽게 blend */
+  border-radius: 4px;
+}
+
+.icon-btn-leetcode:hover img {
+  transform: scale(1.05);
+  transition: transform 0.12s ease;
 }
 
 .status-block {
@@ -1553,6 +1573,44 @@ pre code.hljs {
 
 .modal-close:active {
   background: rgba(255, 255, 255, 0.1);
+}
+
+/* step-3 같은 언어 재upload 경고 */
+.duplicate-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  background: rgba(204, 120, 92, 0.06);
+  border: 1px dashed rgba(204, 120, 92, 0.35);
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.duplicate-warning.hidden { display: none; }
+
+.duplicate-warning .duplicate-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.duplicate-warning strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* step-3 LeetCode 최근 통과 코드 자동 가져오기 */
+.submission-pull-row {
+  display: flex;
+  margin-bottom: 10px;
+}
+
+.submission-pull-row .pull-btn {
+  flex: 1;
 }
 
 /* ─── 풀이 통계 모달 ──────────────────────────────────────── */

@@ -223,6 +223,29 @@ function recordSolution(rec: SolutionRecord): void {
   }
 }
 
+function findExistingSolution(titleSlug: string, language: string): SolutionRecord | undefined {
+  return readSolutions().find((s) => s.titleSlug === titleSlug && s.language === language);
+}
+
+// step-3에 "이미 같은 언어로 풀이 있어요" 알림 표시
+// localStorage 기반 — 다른 디바이스 풀이는 못 잡지만 같은 디바이스는 정확
+function updateDuplicateWarning(): void {
+  const el = $('duplicate-warning');
+  if (!state.problem || !state.selectedLang) {
+    el.classList.add('hidden');
+    return;
+  }
+  const existing = findExistingSolution(state.problem.titleSlug, state.selectedLang);
+  if (!existing) {
+    el.classList.add('hidden');
+    return;
+  }
+  const daysAgo = Math.floor((Date.now() - existing.savedAt) / 86400000);
+  const when = daysAgo === 0 ? '오늘' : daysAgo === 1 ? '어제' : `${daysAgo}일 전`;
+  el.innerHTML = `<span class="duplicate-icon">⚠</span><span><strong>${escapeHtml(state.selectedLang)}</strong>로 ${when} 풀이를 이미 올렸어요. 업로드하면 회고가 새로 생성되고 같은 폴더의 코드/회고가 갱신됩니다 — 의도된 동작이면 그대로 진행해주세요.</span>`;
+  el.classList.remove('hidden');
+}
+
 // ─── 통계 dashboard 렌더링 ───────────────────────────────────
 function ymKey(ts: number): string {
   const d = new Date(ts);
@@ -594,6 +617,7 @@ async function handleFetch(): Promise<void> {
     populateLanguageSelect(state.problem.codeSnippets);
 
     showStep(3);
+    updateDuplicateWarning();
     pushRecent(state.problem);
 
     setStatus(`${state.problem.questionFrontendId}. ${state.problem.title} · 준비 완료`, 'ok');
@@ -780,6 +804,7 @@ function reset(): void {
   $input('problem-input').classList.remove('input-error');
   $('clear-input-btn').classList.add('hidden');
   $('paste-preview').classList.add('hidden');
+  $('duplicate-warning').classList.add('hidden');
   $ta('code-input').value = '';
   $('translation-output').innerHTML = '';
   $('starter-code').textContent = '';
@@ -1074,6 +1099,7 @@ $select('starter-lang-select').addEventListener('change', (e: Event) => {
   setPreferredLang(value);
   updateStarterCode();
   updateCodeHighlight();
+  updateDuplicateWarning();
 });
 
 $btn('open-leetcode-btn').addEventListener('click', () => window.api.openLeetCode());
@@ -1100,6 +1126,49 @@ $('translation-output').addEventListener('click', (e: Event) => {
 });
 
 $btn('pull-embed-btn').addEventListener('click', handlePullFromEmbed);
+
+// step-3: LeetCode 최근 Accepted submission 자동 가져오기
+async function handleFetchSubmission(): Promise<void> {
+  if (!state.problem) {
+    setStatus('먼저 문제를 가져와주세요', 'error');
+    return;
+  }
+  const btn = $btn('fetch-submission-btn');
+  const originalContent = (btn.querySelector('.btn-content') as HTMLElement)?.innerHTML || '';
+  btn.disabled = true;
+  setButtonLoading('fetch-submission-btn', 'LeetCode에서 코드 가져오는 중...');
+  setStatus('LeetCode 세션으로 최근 통과 코드 fetch...', 'busy');
+
+  try {
+    const r = await window.api.fetchSubmission(state.problem.titleSlug);
+    if (!r.ok) throw new Error(r.error);
+
+    // 받은 lang에 맞춰 select 변경 (해당 lang snippet 있어야)
+    const select = $select('starter-lang-select');
+    const options = Array.from(select.options).map((o) => o.value);
+    if (r.langSlug && options.includes(r.langSlug)) {
+      select.value = r.langSlug;
+      state.selectedLang = r.langSlug;
+      setPreferredLang(r.langSlug);
+      updateStarterCode();
+      updateDuplicateWarning();
+    }
+
+    // code 채움 + highlight 갱신
+    $ta('code-input').value = r.code!;
+    updateCodeHighlight();
+
+    setStatus(`✓ ${r.langName || r.langSlug} 코드 ${r.code!.split('\n').length}줄 가져왔어요 — 업로드 버튼 누르면 회고 생성`, 'ok');
+  } catch (e: any) {
+    setStatus(`가져오기 실패: ${e?.message || String(e)}`, 'error');
+  } finally {
+    btn.disabled = false;
+    const content = btn.querySelector('.btn-content') as HTMLElement | null;
+    if (content) content.innerHTML = originalContent;
+  }
+}
+
+$btn('fetch-submission-btn').addEventListener('click', handleFetchSubmission);
 $btn('open-stats-btn').addEventListener('click', openStats);
 $btn('close-stats').addEventListener('click', (e: Event) => {
   e.stopPropagation();

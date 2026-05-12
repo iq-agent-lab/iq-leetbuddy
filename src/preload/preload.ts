@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('api', {
   openLeetCode: (url?: string) => ipcRenderer.invoke('open-leetcode', url),
   getLeetCodeUrl: () => ipcRenderer.invoke('get-leetcode-url'),
   pullLeetCodeUrl: () => ipcRenderer.invoke('pull-leetcode-url'),
+  fetchSubmission: (titleSlug: string) =>
+    ipcRenderer.invoke('fetch-submission', titleSlug),
   createRepo: () => ipcRenderer.invoke('create-repo'),
   verifyGithub: () => ipcRenderer.invoke('verify-github'),
 
