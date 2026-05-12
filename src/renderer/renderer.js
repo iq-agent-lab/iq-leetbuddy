@@ -144,13 +144,19 @@ const HLJS_LANG_MAP = {
   erlang: 'erlang',
 };
 
+const NO_SNIPPET_MESSAGE = `// 이 언어의 시작 코드가 LeetCode에 등록되어 있지 않아요.
+//
+// 다음 중 하나로 진행:
+//   1) 위에서 다른 언어 선택
+//   2) LeetCode 페이지에서 시작 코드를 직접 복사 → 03 단계에 붙여넣기`;
+
 function updateStarterCode() {
   if (!state.problem) return;
   const slug = state.selectedLang;
   const snip = state.problem.codeSnippets?.find((s) => s.langSlug === slug);
   const codeEl = $('starter-code');
 
-  codeEl.textContent = snip ? snip.code : '// 해당 언어의 시작 코드가 없습니다';
+  codeEl.textContent = snip ? snip.code : NO_SNIPPET_MESSAGE;
 
   // highlight.js 적용
   if (window.hljs && snip) {
@@ -191,10 +197,22 @@ function syncCodeScroll() {
   overlay.scrollLeft = ta.scrollLeft;
 }
 
+// fetch 실패 시 input border red + shake 애니메이션
+function flashInputError() {
+  const el = $('problem-input');
+  el.classList.remove('input-error');
+  // reflow 강제 → 같은 클래스 재적용 시 애니메이션 재실행
+  void el.offsetWidth;
+  el.classList.add('input-error');
+  setTimeout(() => el.classList.remove('input-error'), 1500);
+}
+
 async function handleFetch() {
   const input = $('problem-input').value.trim();
   if (!input) {
     setStatus('문제 URL 또는 slug를 입력해주세요', 'error');
+    flashInputError();
+    $('problem-input').focus();
     return;
   }
 
@@ -217,6 +235,7 @@ async function handleFetch() {
     setStatus(`${state.problem.questionFrontendId}. ${state.problem.title} · 준비 완료`, 'ok');
   } catch (e) {
     setStatus(`에러: ${e.message}`, 'error');
+    flashInputError();
   } finally {
     resetButton('fetch-btn', '불러오기');
   }
@@ -233,7 +252,13 @@ function showUploadSuccess(result) {
     <strong>✓ 업로드 완료</strong>
     <div class="result-row"><span class="result-label">폴더</span><code class="inline-mono">${result.folder}</code></div>
     <div class="result-row"><span class="result-label">커밋</span><a href="${result.commitUrl}" target="_blank" rel="noopener">${result.commitSha.slice(0, 7)}</a></div>
+    <div class="action-row">
+      <button class="primary" id="next-problem-btn">
+        <span class="btn-content">다음 문제 가져오기<kbd class="kbd-inline">⌘K</kbd></span>
+      </button>
+    </div>
   `;
+  $('next-problem-btn').addEventListener('click', reset);
   showStep(4);
   setStatus('완료 · 다음 문제 가져오기 가능', 'ok');
 }
@@ -338,6 +363,8 @@ function reset() {
   state.translation = '';
   state.selectedLang = null;
   $('problem-input').value = '';
+  $('problem-input').classList.remove('input-error');
+  $('clear-input-btn').classList.add('hidden');
   $('code-input').value = '';
   $('translation-output').innerHTML = '';
   $('starter-code').textContent = '';
@@ -509,6 +536,21 @@ $('upload-btn').addEventListener('click', handleUpload);
 $('problem-input').addEventListener('keypress', (e) => {
   if (e.key === 'Enter') handleFetch();
 });
+
+// input clear(×) 버튼: input value 있을 때만 visible
+$('problem-input').addEventListener('input', () => {
+  const hasValue = $('problem-input').value.length > 0;
+  $('clear-input-btn').classList.toggle('hidden', !hasValue);
+  // 사용자가 입력 중이면 에러 상태 제거
+  if (hasValue) $('problem-input').classList.remove('input-error');
+});
+
+$('clear-input-btn').addEventListener('click', () => {
+  $('problem-input').value = '';
+  $('problem-input').classList.remove('input-error');
+  $('clear-input-btn').classList.add('hidden');
+  $('problem-input').focus();
+});
 $('starter-lang-select').addEventListener('change', (e) => {
   state.selectedLang = e.target.value;
   updateStarterCode();
@@ -549,6 +591,7 @@ async function handlePullFromEmbed() {
       return;
     }
     $('problem-input').value = r.url;
+    $('clear-input-btn').classList.remove('hidden');
     handleFetch();
   } catch (e) {
     setStatus(`가져오기 실패: ${e.message}`, 'error');
@@ -611,6 +654,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // → input 채우고 자동 fetch (메인 윈도우가 안 보이면 main 프로세스에서 이미 showAndFocus 처리됨)
   window.api.onPullProblem((url) => {
     $('problem-input').value = url;
+    $('clear-input-btn').classList.remove('hidden');
     handleFetch();
   });
 });

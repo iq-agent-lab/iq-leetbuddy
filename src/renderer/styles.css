@@ -273,6 +273,76 @@ html, body {
   margin-bottom: 12px;
 }
 
+/* input + clear(×) 버튼 wrapper */
+.input-with-clear {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-clear input[type="text"] {
+  padding-right: 36px;
+}
+
+.input-clear-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+  transition: all 0.12s ease;
+}
+
+.input-clear-btn:hover {
+  background: var(--bg-soft);
+  color: var(--text);
+}
+
+.input-clear-btn.hidden {
+  display: none;
+}
+
+/* fetch 실패 시 input 강조 (shake + red border) */
+input[type="text"].input-error {
+  border-color: var(--danger);
+  animation: input-shake 0.42s ease;
+}
+
+@keyframes input-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+
+/* 버튼 안 인라인 kbd (단축키 hint) */
+.kbd-inline {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  padding: 1px 5px;
+  margin-left: 8px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+  vertical-align: middle;
+}
+
 /* 임베드 LeetCode → 메인 input URL pull 보조 버튼 */
 button.pull-btn {
   flex-shrink: 0;

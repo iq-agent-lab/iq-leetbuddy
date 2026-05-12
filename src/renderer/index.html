@@ -83,7 +83,10 @@
           </div>
         </div>
         <div class="input-row">
-          <input id="problem-input" type="text" placeholder="LeetCode 문제 URL 또는 slug를 입력해주세요" autocomplete="off" spellcheck="false">
+          <div class="input-with-clear">
+            <input id="problem-input" type="text" placeholder="LeetCode 문제 URL 또는 slug를 입력해주세요" autocomplete="off" spellcheck="false">
+            <button id="clear-input-btn" class="input-clear-btn hidden" aria-label="입력 지우기" title="입력 지우기" tabindex="-1">×</button>
+          </div>
           <button id="pull-embed-btn" class="secondary pull-btn" title="임베드 LeetCode 윈도우의 현재 페이지 URL을 가져와 자동 fetch (⌘⇧↩)">
             <span class="btn-content">↩ 임베드에서</span>
           </button>
