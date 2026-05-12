@@ -36,7 +36,13 @@ export async function fetchProblem(titleSlug: string): Promise<LeetCodeProblem> 
   });
 
   if (!res.ok) {
-    throw new Error(`LeetCode GraphQL HTTP ${res.status}`);
+    if (res.status === 429) {
+      throw new Error(`LeetCode 요청 제한 (HTTP 429) — 잠시 후 다시 시도해주세요`);
+    }
+    if (res.status >= 500) {
+      throw new Error(`LeetCode 서버 응답 오류 (HTTP ${res.status}) — 잠시 후 다시 시도해주세요`);
+    }
+    throw new Error(`LeetCode 응답 오류 (HTTP ${res.status})`);
   }
 
   const json = (await res.json()) as {
@@ -48,7 +54,9 @@ export async function fetchProblem(titleSlug: string): Promise<LeetCodeProblem> 
     throw new Error(`LeetCode GraphQL: ${json.errors.map((e) => e.message).join('; ')}`);
   }
   if (!json.data?.question) {
-    throw new Error(`문제를 찾을 수 없어요: "${titleSlug}"`);
+    throw new Error(
+      `LeetCode에서 "${titleSlug}" 문제를 찾을 수 없어요 — URL 또는 문제 이름을 확인해주세요`
+    );
   }
   return json.data.question;
 }

@@ -8,7 +8,7 @@ let _client: Anthropic | null = null;
 function client(): Anthropic {
   if (!_client) {
     if (!process.env.ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY가 설정되지 않았습니다 (.env 확인)');
+      throw new Error('ANTHROPIC_API_KEY가 설정되지 않았습니다 — ⚙️ 설정에서 입력해주세요');
     }
     _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   }

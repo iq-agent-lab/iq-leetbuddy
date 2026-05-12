@@ -44,7 +44,7 @@ let _octokit: Octokit | null = null;
 function octokit(): Octokit {
   if (!_octokit) {
     if (!process.env.GITHUB_TOKEN) {
-      throw new Error('GITHUB_TOKEN이 설정되지 않았습니다 (.env 확인)');
+      throw new Error('GITHUB_TOKEN이 설정되지 않았습니다 — ⚙️ 설정에서 입력해주세요');
     }
     _octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
   }
@@ -196,7 +196,7 @@ export async function uploadSolution(args: {
   const branch = process.env.GITHUB_BRANCH || 'main';
 
   if (!owner || !repo) {
-    throw new Error('GITHUB_OWNER 또는 GITHUB_REPO가 설정되지 않았습니다 (.env 확인)');
+    throw new Error('GITHUB_OWNER 또는 GITHUB_REPO가 설정되지 않았습니다 — ⚙️ 설정에서 입력해주세요');
   }
 
   const num = String(args.problem.questionFrontendId).padStart(4, '0');
@@ -250,7 +250,7 @@ export async function createRepoIfMissing(): Promise<{
   const owner = process.env.GITHUB_OWNER;
   const repo = process.env.GITHUB_REPO;
   if (!owner || !repo) {
-    throw new Error('GITHUB_OWNER 또는 GITHUB_REPO가 설정되지 않았습니다');
+    throw new Error('GITHUB_OWNER 또는 GITHUB_REPO가 설정되지 않았습니다 — ⚙️ 설정에서 입력해주세요');
   }
 
   const o = octokit();
@@ -311,7 +311,7 @@ export async function verifyConnection(): Promise<{
   const branch = process.env.GITHUB_BRANCH || 'main';
 
   if (!owner || !repo) {
-    throw new Error('GITHUB_OWNER 또는 GITHUB_REPO가 설정되지 않았습니다');
+    throw new Error('GITHUB_OWNER 또는 GITHUB_REPO가 설정되지 않았습니다 — ⚙️ 설정에서 입력해주세요');
   }
 
   const o = octokit();
