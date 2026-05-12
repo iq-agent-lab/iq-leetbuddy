@@ -119,9 +119,93 @@ const INJECT_SCRIPT = `
     document.body.appendChild(btn);
   }
 
+  // ─── lang hint: 메인에서 '원문' 클릭 시 hash로 전달된 lang을 안내 + 자동 선택 시도 ───
+  // LeetCode UI 변경에 fragile하므로 best-effort. 실패해도 토스트는 표시.
+  const LANG_DISPLAY = {
+    python3:'Python3', python:'Python', java:'Java',
+    cpp:'C++', c:'C', csharp:'C#',
+    javascript:'JavaScript', typescript:'TypeScript',
+    go:'Go', golang:'Go', kotlin:'Kotlin', rust:'Rust',
+    swift:'Swift', ruby:'Ruby', scala:'Scala', php:'PHP',
+    dart:'Dart', elixir:'Elixir', erlang:'Erlang',
+  };
+  const ALL_DISPLAYS = Object.values(LANG_DISPLAY);
+
+  function showLangToast(targetLang, display) {
+    const TOAST_ID = '__iq_leetbuddy_lang_toast__';
+    const existing = document.getElementById(TOAST_ID);
+    if (existing) existing.remove();
+    if (!document.body) return;
+
+    const toast = document.createElement('div');
+    toast.id = TOAST_ID;
+    toast.style.cssText = [
+      'position:fixed','top:64px','right:24px','z-index:2147483646',
+      'padding:12px 16px','background:rgba(20,18,16,0.96)','color:#fff',
+      'border-radius:10px','font-size:13px',
+      'font-family:-apple-system,system-ui,sans-serif',
+      'box-shadow:0 8px 24px rgba(0,0,0,0.5)','max-width:300px','line-height:1.55',
+      'border-left:3px solid #cc785c','transition:opacity 0.4s ease',
+    ].join(';');
+    toast.innerHTML =
+      '<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:4px;">' +
+      '<strong style="color:#cc785c;font-size:12px;letter-spacing:0.04em;">LEETBUDDY</strong>' +
+      '<span style="color:rgba(255,255,255,0.5);font-size:11px;">선택된 시작 언어</span>' +
+      '</div>' +
+      '<div style="font-size:15px;font-weight:600;margin-bottom:4px;">' + display + '</div>' +
+      '<div style="opacity:0.6;font-size:11px;">에디터 좌측 상단 lang 드롭다운에서 직접 변경 가능</div>';
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; }, 5500);
+    setTimeout(() => toast.remove(), 6000);
+  }
+
+  function trySwitchLang(display) {
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      const buttons = Array.from(document.querySelectorAll('button'));
+      let langBtn = null;
+      for (const b of buttons) {
+        const txt = (b.textContent || '').trim();
+        if (ALL_DISPLAYS.includes(txt)) { langBtn = b; break; }
+      }
+      if (!langBtn) {
+        if (attempts > 25) clearInterval(interval); // ~7.5s
+        return;
+      }
+      clearInterval(interval);
+      const current = (langBtn.textContent || '').trim();
+      if (current === display) return; // 이미 맞음
+      langBtn.click();
+      // 드롭다운 옵션 클릭 (열린 후 약간 대기)
+      setTimeout(() => {
+        const items = document.querySelectorAll('[role="option"], [role="menuitem"], li, [role="button"]');
+        for (const item of items) {
+          if ((item.textContent || '').trim() === display) {
+            item.click();
+            break;
+          }
+        }
+      }, 220);
+    }, 300);
+  }
+
+  function ensureLangHint() {
+    const m = location.hash.match(/leetbuddy-lang=([\\w-]+)/);
+    if (!m) return;
+    const targetLang = m[1].toLowerCase();
+    if (window.__IQ_LEETBUDDY_LANG__ === targetLang) return;
+    window.__IQ_LEETBUDDY_LANG__ = targetLang;
+
+    const display = LANG_DISPLAY[targetLang] || targetLang;
+    showLangToast(targetLang, display);
+    trySwitchLang(display);
+  }
+
   // SPA navigation (history pushState) 대응: 초기 + interval 폴링
   ensureBtn();
-  setInterval(ensureBtn, 1200);
+  ensureLangHint();
+  setInterval(() => { ensureBtn(); ensureLangHint(); }, 1200);
 })();
 `;
 

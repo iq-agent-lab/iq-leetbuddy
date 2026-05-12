@@ -873,6 +873,118 @@ textarea::-webkit-scrollbar-track {
   font-style: italic;
 }
 
+/* ─── hint card grid (입력 형식 안내) ─── */
+.step-hint-lead {
+  margin-bottom: 10px;
+}
+
+.hint-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.hint-card {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.15s ease;
+}
+
+.hint-card:hover {
+  border-color: var(--border-strong);
+}
+
+.hint-card-wide {
+  grid-column: 1 / -1;
+}
+
+.hint-card-accent {
+  border-style: dashed;
+  border-color: rgba(204, 120, 92, 0.35);
+  background: rgba(204, 120, 92, 0.04);
+}
+
+.hint-card-accent:hover {
+  border-style: solid;
+  border-color: var(--accent);
+  background: rgba(204, 120, 92, 0.07);
+}
+
+.hint-card-label {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 500;
+}
+
+.hint-card-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  align-items: center;
+}
+
+.hint-card-examples-stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.hint-card-examples code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: var(--accent-soft);
+  word-break: break-all;
+}
+
+.hint-card-note {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.hint-card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.hint-card-list li {
+  padding-left: 14px;
+  position: relative;
+}
+
+.hint-card-list li::before {
+  content: '·';
+  position: absolute;
+  left: 4px;
+  color: var(--accent-soft);
+  font-weight: 700;
+}
+
+.hint-card-list strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
 /* ─── action row inside error pane ─── */
 .action-row {
   display: flex;

@@ -516,6 +516,28 @@ $('starter-lang-select').addEventListener('change', (e) => {
 });
 $('open-leetcode-btn').addEventListener('click', () => window.api.openLeetCode());
 
+// 번역 영역의 LeetCode 링크 (특히 "원문") 클릭 시 현재 선택된 시작 언어를
+// URL hash에 담아 임베드 윈도우로 전달. main의 INJECT_SCRIPT가 hash를 읽어
+// 토스트로 안내 + LeetCode lang dropdown 자동 클릭 시도(best-effort)
+$('translation-output').addEventListener('click', (e) => {
+  const a = e.target.closest('a');
+  if (!a) return;
+  const href = a.getAttribute('href') || '';
+  if (!/leetcode\.com\/problems\//i.test(href)) return;
+  e.preventDefault();
+  let finalUrl = href;
+  if (state.selectedLang) {
+    try {
+      const u = new URL(href);
+      u.hash = `leetbuddy-lang=${state.selectedLang}`;
+      finalUrl = u.toString();
+    } catch {
+      // URL 파싱 실패 시 원본 그대로
+    }
+  }
+  window.api.openLeetCode(finalUrl);
+});
+
 // 임베드 LeetCode 윈도우의 현재 URL을 input에 채우고 자동 fetch
 async function handlePullFromEmbed() {
   const btn = $('pull-embed-btn');

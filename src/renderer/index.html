@@ -44,16 +44,44 @@
       </div>
       <div class="step-body">
         <h2 class="step-title">문제 가져오기</h2>
-        <p class="step-hint">
-          URL · slug · 문제 이름 모두 OK<br>
-          <span class="hint-examples">
-            <code>two-sum</code> ·
-            <code>Symmetric Tree</code> ·
-            <code>https://leetcode.com/problems/.../description/?envType=...&envId=...</code>
-          </span>
-          <span class="hint-note">LeetCode 어떤 페이지든 주소창 그대로 붙여넣으면 됨 (envType, envId 쿼리 자동 무시)</span>
-          <span class="hint-note">또는 임베드 LeetCode 윈도우에서 우하단 <strong>"→ leetbuddy로 가져오기"</strong> 버튼 클릭 · 메뉴바 <kbd>⌘⇧↩</kbd> · 아래 <strong>↩ 임베드에서</strong> 버튼</span>
+        <p class="step-hint step-hint-lead">
+          어떤 형식이든 OK — 대소문자, 공백, <code>-</code>, <code>_</code> 모두 자동 정규화
         </p>
+        <div class="hint-grid">
+          <div class="hint-card">
+            <span class="hint-card-label">slug 그대로</span>
+            <div class="hint-card-examples">
+              <code>two-sum</code>
+              <code>symmetric-tree</code>
+            </div>
+          </div>
+          <div class="hint-card">
+            <span class="hint-card-label">문제 이름 (자유 형식)</span>
+            <div class="hint-card-examples">
+              <code>Two Sum</code>
+              <code>symmetric tree</code>
+              <code>TWO SUM</code>
+              <code>symmetric_tree</code>
+            </div>
+            <span class="hint-card-note">대소문자/공백/언더스코어 무관</span>
+          </div>
+          <div class="hint-card hint-card-wide">
+            <span class="hint-card-label">전체 URL (어떤 페이지든)</span>
+            <div class="hint-card-examples hint-card-examples-stacked">
+              <code>https://leetcode.com/problems/two-sum/</code>
+              <code>https://leetcode.com/problems/.../description/?envType=...&envId=...</code>
+            </div>
+            <span class="hint-card-note">envType, envId 등 쿼리 자동 무시 — 주소창 그대로 붙여넣어도 됨</span>
+          </div>
+          <div class="hint-card hint-card-accent">
+            <span class="hint-card-label">임베드 LeetCode에서 가져오기</span>
+            <ul class="hint-card-list">
+              <li>임베드 윈도우 우하단 <strong>"→ leetbuddy로 가져오기"</strong> chip</li>
+              <li>메뉴바 <kbd>⌘⇧↩</kbd></li>
+              <li>아래 <strong>"↩ 임베드에서"</strong> 버튼</li>
+            </ul>
+          </div>
+        </div>
         <div class="input-row">
           <input id="problem-input" type="text" placeholder="LeetCode 문제 URL 또는 slug를 입력해주세요" autocomplete="off" spellcheck="false">
           <button id="pull-embed-btn" class="secondary pull-btn" title="임베드 LeetCode 윈도우의 현재 페이지 URL을 가져와 자동 fetch (⌘⇧↩)">
