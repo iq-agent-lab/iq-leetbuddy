@@ -86,6 +86,59 @@ async function checkConfig() {
   }
 }
 
+// ─── 최근 풀이 5개 (localStorage chips) ───
+const RECENT_KEY = 'iq-leetbuddy:recent-problems';
+const RECENT_MAX = 5;
+
+function readRecent() {
+  try {
+    const raw = localStorage.getItem(RECENT_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+function pushRecent(problem) {
+  try {
+    const item = {
+      frontendId: problem.questionFrontendId,
+      title: problem.title,
+      titleSlug: problem.titleSlug,
+      savedAt: Date.now(),
+    };
+    const filtered = readRecent().filter((p) => p.titleSlug !== item.titleSlug);
+    filtered.unshift(item);
+    const sliced = filtered.slice(0, RECENT_MAX);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(sliced));
+    renderRecent();
+  } catch {
+    // localStorage 사용 불가 시 무시
+  }
+}
+
+function renderRecent() {
+  const arr = readRecent();
+  const wrap = $('recent-row');
+  if (arr.length === 0) {
+    wrap.classList.add('hidden');
+    wrap.innerHTML = '';
+    return;
+  }
+  const chips = arr
+    .map((p) => {
+      const slug = escapeHtml(p.titleSlug);
+      const title = escapeHtml(p.title);
+      const id = escapeHtml(String(p.frontendId));
+      return `<button class="recent-chip" data-slug="${slug}" title="${id}. ${title}"><span class="recent-chip-id">${id}.</span>${title}</button>`;
+    })
+    .join('');
+  wrap.innerHTML = `<span class="recent-label">최근</span>${chips}`;
+  wrap.classList.remove('hidden');
+}
+
 // 마지막 선택 언어 기억 — 사용자가 매번 java→python으로 바꾸는 마찰 제거
 const PREFERRED_LANG_KEY = 'iq-leetbuddy:preferred-lang';
 
@@ -264,6 +317,7 @@ async function handleFetch() {
     populateLanguageSelect(result.problem.codeSnippets);
 
     showStep(3);
+    pushRecent(state.problem);
 
     setStatus(`${state.problem.questionFrontendId}. ${state.problem.title} · 준비 완료`, 'ok');
   } catch (e) {
@@ -644,6 +698,18 @@ $('clear-input-btn').addEventListener('click', () => {
   $('paste-preview').classList.add('hidden');
   $('problem-input').focus();
 });
+
+// 최근 풀이 chip 클릭 → input 채우고 자동 fetch (이벤트 위임)
+$('recent-row').addEventListener('click', (e) => {
+  const chip = e.target.closest('.recent-chip');
+  if (!chip) return;
+  const slug = chip.dataset.slug;
+  if (!slug) return;
+  $('problem-input').value = slug;
+  $('clear-input-btn').classList.remove('hidden');
+  updatePastePreview();
+  handleFetch();
+});
 $('starter-lang-select').addEventListener('change', (e) => {
   state.selectedLang = e.target.value;
   setPreferredLang(e.target.value); // 다음 fetch에서도 같은 언어로 시작
@@ -728,6 +794,7 @@ document.addEventListener('keydown', (e) => {
 
 window.addEventListener('DOMContentLoaded', () => {
   checkConfig();
+  renderRecent();
   $('problem-input').focus();
 
   // 진행 상황 listeners

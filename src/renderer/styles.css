@@ -273,6 +273,67 @@ html, body {
   margin-bottom: 12px;
 }
 
+/* 최근 풀이 chips (step-1, hint-grid 위) */
+.recent-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 8px 12px;
+  background: rgba(204, 120, 92, 0.04);
+  border: 1px solid rgba(204, 120, 92, 0.15);
+  border-radius: 8px;
+}
+
+.recent-row.hidden {
+  display: none;
+}
+
+.recent-label {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 500;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+.recent-chip {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-size: 11.5px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.5;
+}
+
+.recent-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent-soft);
+  background: var(--bg-elevated);
+}
+
+.recent-chip .recent-chip-id {
+  color: var(--text-dim);
+  margin-right: 4px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+.recent-chip:hover .recent-chip-id {
+  color: var(--accent);
+}
+
 /* paste/입력 정규화 미리보기 (input-row 바로 아래) */
 .paste-preview {
   font-family: var(--font-mono);
