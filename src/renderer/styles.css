@@ -535,14 +535,11 @@ textarea {
 }
 
 /* ─── code editor (textarea + hljs overlay) ─── */
+/* CodeMirror 5 컨테이너 — material-darker 테마 위에 우리 색상 살짝 덮음 */
 .code-editor-wrap {
-  position: relative;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 6px;
-  height: 360px;
-  min-height: 200px;
-  resize: vertical;
   overflow: hidden;
   transition: border-color 0.15s, box-shadow 0.15s;
   margin-bottom: 12px;
@@ -553,68 +550,50 @@ textarea {
   box-shadow: 0 0 0 3px var(--accent-bg);
 }
 
-.code-highlight-overlay,
-.code-editor-wrap > textarea {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  margin: 0;
-  padding: 14px 16px;
+.code-editor-wrap .CodeMirror {
+  height: 360px;
   font-family: var(--font-mono);
   font-size: 12.5px;
   line-height: 1.65;
-  letter-spacing: 0;
-  font-weight: 400;
-  white-space: pre;
-  overflow: auto;
-  box-sizing: border-box;
-  tab-size: 4;
+  background: var(--bg-elevated);
 }
 
-.code-highlight-overlay {
-  pointer-events: none;
-  background: transparent;
-  border: none;
-  z-index: 0;
+.code-editor-wrap .CodeMirror-gutters {
+  background: var(--bg-soft);
+  border-right: 1px solid var(--border);
 }
 
-.code-highlight-overlay code {
-  display: block;
-  background: transparent !important;
-  padding: 0 !important;
-  margin: 0;
-  font: inherit;
-  white-space: pre;
-  color: var(--text);
-}
-
-.code-editor-wrap > textarea {
-  background: transparent;
-  border: none !important;
-  color: transparent;
-  caret-color: var(--text);
-  -webkit-text-fill-color: transparent;
-  resize: none;
-  outline: none;
-  width: 100%;
-  z-index: 1;
-  min-height: 0;
-}
-
-.code-editor-wrap > textarea:focus {
-  box-shadow: none !important;
-  border: none !important;
-}
-
-.code-editor-wrap > textarea::selection {
-  background: rgba(204, 120, 92, 0.35);
-}
-
-.code-editor-wrap > textarea::placeholder {
+.code-editor-wrap .CodeMirror-linenumber {
   color: var(--text-dim);
-  -webkit-text-fill-color: var(--text-dim);
+  padding: 0 8px 0 12px;
+  font-size: 11px;
+}
+
+.code-editor-wrap .CodeMirror-activeline-background {
+  background: rgba(204, 120, 92, 0.05);
+}
+
+.code-editor-wrap .CodeMirror-activeline-gutter {
+  background: rgba(204, 120, 92, 0.08);
+}
+
+.code-editor-wrap .CodeMirror-cursor {
+  border-left: 1.5px solid var(--accent);
+}
+
+.code-editor-wrap .CodeMirror-selected {
+  background: rgba(204, 120, 92, 0.25) !important;
+}
+
+.code-editor-wrap .CodeMirror-matchingbracket {
+  color: var(--accent) !important;
+  background: rgba(204, 120, 92, 0.18);
+  border-radius: 2px;
+}
+
+.code-editor-wrap .CodeMirror-placeholder {
+  color: var(--text-dim);
+  font-style: italic;
 }
 
 /* ─── buttons ─── */
@@ -1504,6 +1483,14 @@ pre code.hljs {
   justify-content: center;
   padding: 40px 20px;
   animation: fade-in 0.18s ease-out;
+  /*
+   * 핵심: macOS hidden inset titlebar의 .app-header에 -webkit-app-region: drag가 적용되어
+   * 있는데, modal이 viewport 상단에서 .app-header와 좌표상 겹치면 native drag region이
+   * z-index 무시하고 click을 가로채서 X/cancel button이 안 먹힘.
+   * 모달 영역 전체를 drag region에서 명시적으로 제외.
+   * (사용자 발견 패턴: page scroll 후엔 X가 동작 → .app-header가 위로 밀려나면서 겹침 해소)
+   */
+  -webkit-app-region: no-drag;
 }
 
 @keyframes fade-in {
@@ -1601,6 +1588,13 @@ pre code.hljs {
 .duplicate-warning strong {
   color: var(--text);
   font-weight: 500;
+}
+
+.duplicate-warning .duplicate-sub {
+  display: inline-block;
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 11px;
 }
 
 /* step-3 LeetCode 최근 통과 코드 자동 가져오기 */

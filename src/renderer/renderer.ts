@@ -12,7 +12,70 @@ function $<T extends HTMLElement = HTMLElement>(id: string): T {
 const $input = (id: string) => $<HTMLInputElement>(id);
 const $btn = (id: string) => $<HTMLButtonElement>(id);
 const $select = (id: string) => $<HTMLSelectElement>(id);
-const $ta = (id: string) => $<HTMLTextAreaElement>(id);
+
+// CodeMirror 5 — global (UMD)
+declare const CodeMirror: any;
+
+// LeetCode langSlug → CodeMirror 5 MIME mode
+// 미지원 lang은 text/plain fallback (syntax color 없음, 편집은 정상)
+const CM5_MODE: Record<string, string> = {
+  java: 'text/x-java',
+  cpp: 'text/x-c++src',
+  c: 'text/x-csrc',
+  csharp: 'text/x-csharp',
+  'c#': 'text/x-csharp',
+  kotlin: 'text/x-kotlin',
+  scala: 'text/x-scala',
+  python: 'text/x-python',
+  python3: 'text/x-python',
+  javascript: 'text/javascript',
+  typescript: 'application/typescript',
+  go: 'text/x-go',
+  golang: 'text/x-go',
+  rust: 'text/x-rustsrc',
+  swift: 'text/x-swift',
+  ruby: 'text/x-ruby',
+  dart: 'application/dart',
+};
+
+let cmEditor: any = null;
+
+function initCodeEditor(): void {
+  const container = $('code-editor');
+  if (typeof CodeMirror === 'undefined') {
+    console.warn('CodeMirror not loaded');
+    return;
+  }
+  cmEditor = CodeMirror(container, {
+    value: '',
+    mode: 'text/plain',
+    theme: 'material-darker',
+    lineNumbers: true,
+    indentUnit: 4,
+    tabSize: 4,
+    indentWithTabs: false,
+    matchBrackets: true,
+    autoCloseBrackets: true,
+    styleActiveLine: true,
+    lineWrapping: false,
+    placeholder: '// 여기에 통과한 코드를 붙여넣어주세요 (또는 위 버튼으로 자동 가져오기)',
+  });
+}
+
+function setEditorLang(slug: string | null): void {
+  if (!cmEditor) return;
+  const mode = (slug && CM5_MODE[slug.toLowerCase()]) || 'text/plain';
+  cmEditor.setOption('mode', mode);
+}
+
+function getEditorCode(): string {
+  return cmEditor ? cmEditor.getValue() : '';
+}
+
+function setEditorCode(code: string): void {
+  if (!cmEditor) return;
+  cmEditor.setValue(code);
+}
 
 // ─── progress 메시지 ─────────────────────────────────────────
 const FETCH_PROGRESS_TEXT: Record<string, string> = {
@@ -242,7 +305,7 @@ function updateDuplicateWarning(): void {
   }
   const daysAgo = Math.floor((Date.now() - existing.savedAt) / 86400000);
   const when = daysAgo === 0 ? '오늘' : daysAgo === 1 ? '어제' : `${daysAgo}일 전`;
-  el.innerHTML = `<span class="duplicate-icon">⚠</span><span><strong>${escapeHtml(state.selectedLang)}</strong>로 ${when} 풀이를 이미 올렸어요. 업로드하면 회고가 새로 생성되고 같은 폴더의 코드/회고가 갱신됩니다 — 의도된 동작이면 그대로 진행해주세요.</span>`;
+  el.innerHTML = `<span class="duplicate-icon">⚠</span><span><strong>${escapeHtml(state.selectedLang)}</strong>로 ${when} 풀이를 이미 올렸어요. 업로드하면 회고가 새로 생성되고 같은 폴더의 코드/회고가 갱신됩니다.<br><span class="duplicate-sub">— 의도된 동작이면 그대로 진행해주세요.</span></span>`;
   el.classList.remove('hidden');
 }
 
@@ -441,6 +504,7 @@ function populateLanguageSelect(snippets: CodeSnippetLite[] | undefined): void {
   state.selectedLang = defaultSlug;
 
   updateStarterCode();
+  setEditorLang(defaultSlug);
   $('starter-block').classList.remove('hidden');
 }
 
@@ -523,33 +587,7 @@ function updateStarterCode(): void {
   }
 }
 
-// 통과 코드 textarea의 hljs overlay 갱신
-function updateCodeHighlight(): void {
-  const code = $ta('code-input').value;
-  const codeEl = $('code-highlight-content');
-  // 끝 newline 처리 - textarea 마지막에 newline 없으면 overlay가 살짝 짧아짐
-  codeEl.textContent = code.endsWith('\n') ? code + ' ' : code + '\n';
-
-  if (window.hljs) {
-    const slug = state.selectedLang || 'python3';
-    const hlLang = HLJS_LANG_MAP[slug] || 'plaintext';
-    codeEl.className = `language-${hlLang}`;
-    delete codeEl.dataset.highlighted;
-    try {
-      window.hljs.highlightElement(codeEl);
-    } catch {
-      /* ignore */
-    }
-  }
-}
-
-function syncCodeScroll(): void {
-  const ta = $ta('code-input');
-  const overlay = document.querySelector<HTMLElement>('.code-highlight-overlay');
-  if (!overlay) return;
-  overlay.scrollTop = ta.scrollTop;
-  overlay.scrollLeft = ta.scrollLeft;
-}
+// (구) textarea + hljs overlay 코드는 CodeMirror 5로 대체됨 — setEditorLang 사용
 
 // ─── credential 에러 자동 모달 ───────────────────────────────
 function isCredentialError(msg: string | undefined | null): boolean {
@@ -777,7 +815,7 @@ async function handleCreateRepo(): Promise<void> {
 async function handleUpload(): Promise<void> {
   if (!state.problem) return;
 
-  const code = $ta('code-input').value;
+  const code = getEditorCode();
   const language = state.selectedLang || 'python3';
 
   if (!code.trim()) {
@@ -805,10 +843,9 @@ function reset(): void {
   $('clear-input-btn').classList.add('hidden');
   $('paste-preview').classList.add('hidden');
   $('duplicate-warning').classList.add('hidden');
-  $ta('code-input').value = '';
+  setEditorCode('');
   $('translation-output').innerHTML = '';
   $('starter-code').textContent = '';
-  $('code-highlight-content').textContent = '';
   $('result-output').innerHTML = '';
   ['step-2', 'step-3', 'step-4'].forEach((id) => $(id).classList.add('hidden'));
   $('starter-block').classList.add('hidden');
@@ -867,11 +904,18 @@ async function openSettings(): Promise<void> {
 
   $('pat-help-panel').classList.add('hidden');
   $('verify-result').classList.add('hidden');
-  $('settings-modal').classList.remove('hidden');
+  const modal = $('settings-modal');
+  modal.classList.remove('hidden');
+  // closeSettings에서 inline display:none 강제 추가했으면 여기서 제거
+  (modal as HTMLElement).style.display = '';
 }
 
 function closeSettings(): void {
-  $('settings-modal').classList.add('hidden');
+  const modal = $('settings-modal');
+  modal.classList.add('hidden');
+  // 일부 환경에서 transition/animation 잔재로 화면 그대로 보이는 경우 강제 hide
+  (modal as HTMLElement).style.display = 'none';
+  // 다음 open 시 .hidden 제거 + inline display 제거
 }
 
 async function saveSettings(): Promise<void> {
@@ -1098,7 +1142,7 @@ $select('starter-lang-select').addEventListener('change', (e: Event) => {
   state.selectedLang = value;
   setPreferredLang(value);
   updateStarterCode();
-  updateCodeHighlight();
+  setEditorLang(value);
   updateDuplicateWarning();
 });
 
@@ -1154,9 +1198,9 @@ async function handleFetchSubmission(): Promise<void> {
       updateDuplicateWarning();
     }
 
-    // code 채움 + highlight 갱신
-    $ta('code-input').value = r.code!;
-    updateCodeHighlight();
+    // code 채움 + editor mode 갱신
+    setEditorCode(r.code!);
+    setEditorLang(r.langSlug || state.selectedLang);
 
     setStatus(`✓ ${r.langName || r.langSlug} 코드 ${r.code!.split('\n').length}줄 가져왔어요 — 업로드 버튼 누르면 회고 생성`, 'ok');
   } catch (e: any) {
@@ -1180,15 +1224,11 @@ $('stats-modal').addEventListener('click', (e: Event) => {
 });
 
 $btn('open-settings-btn').addEventListener('click', openSettings);
-// X 버튼: bubbling으로 인한 settings-modal backdrop click handler와 충돌 차단
-$btn('close-settings').addEventListener('click', (e: Event) => {
-  e.stopPropagation();
-  closeSettings();
-});
-$btn('cancel-settings').addEventListener('click', (e: Event) => {
-  e.stopPropagation();
-  closeSettings();
-});
+// X / cancel button — bubble 허용. backdrop handler에 fallback 있어 두 번 호출되어도
+// idempotent. stopPropagation 제거가 X 안 먹던 원인이었을 수 있음 (불명확하지만
+// 명확한 fallback이 더 robust).
+$btn('close-settings').addEventListener('click', closeSettings);
+$btn('cancel-settings').addEventListener('click', closeSettings);
 $btn('save-settings').addEventListener('click', saveSettings);
 
 $btn('pat-help-btn').addEventListener('click', () => {
@@ -1197,13 +1237,24 @@ $btn('pat-help-btn').addEventListener('click', () => {
 
 $btn('verify-github-btn').addEventListener('click', handleVerifyGithub);
 
-// textarea ↔ overlay 동기화
-$ta('code-input').addEventListener('input', updateCodeHighlight);
-$ta('code-input').addEventListener('scroll', syncCodeScroll);
+// (구) textarea ↔ overlay 동기화 — CodeMirror 5로 대체됨, 별도 listener 불필요
 
+// settings-modal click handler — backdrop click + X/cancel button **fallback**
+// 별도 X/cancel listener가 어떤 이유로 동작 안 해도 (예: stopPropagation 실패,
+// listener 등록 race) 여기서 잡음. 진단 추적 + 동작 보장.
 $('settings-modal').addEventListener('click', (e: Event) => {
   const target = e.target as HTMLElement | null;
-  if (target?.id === 'settings-modal') closeSettings();
+  if (!target) return;
+  // backdrop 자체 클릭
+  if (target.id === 'settings-modal') {
+    closeSettings();
+    return;
+  }
+  // X / cancel button (또는 그 안의 child element)
+  if (target.closest('#close-settings') || target.closest('#cancel-settings')) {
+    closeSettings();
+    return;
+  }
 });
 
 document.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -1222,6 +1273,7 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
 window.addEventListener('DOMContentLoaded', () => {
   checkConfig();
   renderRecent();
+  initCodeEditor();
   $input('problem-input').focus();
 
   // 진행 상황 listeners

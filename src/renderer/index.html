@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../vendor/highlight-theme.css">
+  <link rel="stylesheet" href="../vendor/codemirror/codemirror.css">
+  <link rel="stylesheet" href="../vendor/codemirror/theme/material-darker.css">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -139,10 +141,7 @@
             <span class="btn-content">↩ LeetCode에서 최근 통과 코드 가져오기</span>
           </button>
         </div>
-        <div class="code-editor-wrap">
-          <pre class="code-highlight-overlay" aria-hidden="true"><code id="code-highlight-content"></code></pre>
-          <textarea id="code-input" placeholder="// 여기에 통과한 코드를 붙여넣어주세요 (또는 위 버튼으로 자동 가져오기)" spellcheck="false"></textarea>
-        </div>
+        <div class="code-editor-wrap" id="code-editor"></div>
         <button id="upload-btn" class="primary block">
           <span class="btn-content">AI 회고 생성 후 GitHub에 업로드</span>
         </button>
@@ -318,6 +317,20 @@
   </div>
 
   <script src="../vendor/highlight.min.js"></script>
+  <!-- CodeMirror 5 — UMD bundle. core 먼저 → modes (clike는 dart 의존성) → addons 순서 -->
+  <script src="../vendor/codemirror/codemirror.js"></script>
+  <script src="../vendor/codemirror/mode/clike.js"></script>
+  <script src="../vendor/codemirror/mode/python.js"></script>
+  <script src="../vendor/codemirror/mode/javascript.js"></script>
+  <script src="../vendor/codemirror/mode/go.js"></script>
+  <script src="../vendor/codemirror/mode/rust.js"></script>
+  <script src="../vendor/codemirror/mode/swift.js"></script>
+  <script src="../vendor/codemirror/mode/ruby.js"></script>
+  <script src="../vendor/codemirror/mode/dart.js"></script>
+  <script src="../vendor/codemirror/addon/matchbrackets.js"></script>
+  <script src="../vendor/codemirror/addon/closebrackets.js"></script>
+  <script src="../vendor/codemirror/addon/placeholder.js"></script>
+  <script src="../vendor/codemirror/addon/active-line.js"></script>
   <script src="./renderer.js"></script>
 </body>
 </html>
