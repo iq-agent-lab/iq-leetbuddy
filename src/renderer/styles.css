@@ -1,9 +1,19 @@
 /* ============================================================
    iq-leetbuddy — design system
-   aesthetic: editorial dark · serif display · coral accent
+   aesthetic: editorial · serif display · coral accent
+   themes: dark (default) · light · sepia (중간)
    ============================================================ */
 
 :root {
+  /* 폰트는 테마와 무관 */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+}
+
+/* ─── Dark theme (default) ────────────────────────────────── */
+:root,
+html.theme-dark {
   --bg: #0d0c0b;
   --bg-elevated: #15130f;
   --bg-soft: #1b1814;
@@ -20,11 +30,30 @@
   --success-bg: rgba(138, 184, 122, 0.08);
   --danger: #d97070;
   --danger-bg: rgba(217, 112, 112, 0.08);
-
-  --font-display: 'Fraunces', Georgia, serif;
-  --font-body: 'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+  --grain-opacity: 0.035;
 }
+
+/* ─── Light theme — 따뜻한 오프화이트 (macOS feel) ───────── */
+html.theme-light {
+  --bg: #faf7f1;
+  --bg-elevated: #ffffff;
+  --bg-soft: #f0ece4;
+  --bg-code: #f5f1e8;
+  --border: #e0d9cd;
+  --border-strong: #c9c1b3;
+  --text: #2c2620;
+  --text-muted: #6b6258;
+  --text-dim: #9a9085;
+  --accent: #b65a3e;
+  --accent-soft: #c46847;
+  --accent-bg: rgba(182, 90, 62, 0.07);
+  --success: #5a8f4a;
+  --success-bg: rgba(90, 143, 74, 0.07);
+  --danger: #b85050;
+  --danger-bg: rgba(184, 80, 80, 0.07);
+  --grain-opacity: 0.018;
+}
+
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -46,7 +75,7 @@ html, body {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  opacity: 0.035;
+  opacity: var(--grain-opacity, 0.035);
   z-index: 1000;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.9'/%3E%3C/svg%3E");
 }
@@ -55,8 +84,8 @@ html, body {
 .app-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  padding: 28px 48px 24px;
+  align-items: center;
+  padding: 58px 40px 34px 32px;
   border-bottom: 1px solid var(--border);
   -webkit-app-region: drag;
 }
@@ -64,10 +93,85 @@ html, body {
 .title-block {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 18px;
+}
+
+/* ─── 행성 wrap + halo(회전) + pulse + body ─────────────────
+ * macOS Siri orb / aurora 느낌 — 코랄 행성 주위로 따뜻한 빛이
+ * 회전하면서 호흡하듯 강약. 세 layer:
+ *   .planet-halo  — conic gradient 회전 (5초)
+ *   .planet-pulse — radial glow 호흡 (3.5초)
+ *   .planet       — 본체 (기존 디자인 유지 + 살짝 위아래 흔들기)
+ */
+.planet-wrap {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  animation: planet-drift 12s ease-in-out infinite;
+}
+
+/* Dark/Sepia/System(dark) 기본 — 따뜻한 흰빛 halo */
+.planet-halo {
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(255, 220, 200, 0.55) 60deg,
+    rgba(255, 240, 220, 0.3) 100deg,
+    transparent 200deg,
+    transparent 360deg
+  );
+  filter: blur(4px);
+  animation: planet-halo-rotate 5s linear infinite;
+  pointer-events: none;
+}
+
+.planet-pulse {
+  position: absolute;
+  inset: -11px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 210, 190, 0.28) 0%,
+    rgba(255, 210, 190, 0.1) 35%,
+    transparent 70%
+  );
+  animation: planet-pulse 3.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Light theme — 흰 배경에 흰빛은 안 보임. 반대로 어두운 그림자가
+ * 행성에서 퍼져나오는 느낌 (warm dark brown). */
+html.theme-light .planet-halo {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(80, 35, 20, 0.45) 60deg,
+    rgba(120, 55, 35, 0.25) 100deg,
+    transparent 200deg,
+    transparent 360deg
+  );
+  filter: blur(5px);
+}
+
+html.theme-light .planet-pulse {
+  background: radial-gradient(
+    circle,
+    rgba(90, 40, 25, 0.22) 0%,
+    rgba(90, 40, 25, 0.08) 35%,
+    transparent 70%
+  );
 }
 
 .planet {
+  position: relative;
+  z-index: 1;
   width: 28px;
   height: 28px;
   border-radius: 50%;
@@ -77,13 +181,60 @@ html, body {
     0 0 24px rgba(204, 120, 92, 0.25),
     inset -4px -4px 8px rgba(0, 0, 0, 0.4);
   flex-shrink: 0;
-  position: relative;
-  animation: planet-drift 12s ease-in-out infinite;
+  overflow: hidden; /* sparkle이 행성 표면 밖으로 안 새도록 */
+}
+
+/* 행성 표면 반짝임 — 좌상단에 작은 sparkle이 호흡하듯 깜빡임 +
+ * 푸른빛 → 흰빛 → 붉은빛으로 색조가 은은하게 순환 (5초 주기).
+ * 표면 위 highlight가 살아있는 느낌. inset shadow와 대조되어 자연스러운 입체감. */
+.planet::before {
+  content: '';
+  position: absolute;
+  top: 18%;
+  left: 22%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  filter: blur(0.5px);
+  animation: planet-sparkle 5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes planet-sparkle {
+  0% {
+    opacity: 0.45; transform: scale(0.75);
+    background: radial-gradient(circle, rgba(170, 210, 255, 0.7) 0%, rgba(170, 210, 255, 0) 70%);
+  }
+  25% {
+    opacity: 0.75; transform: scale(0.95);
+    background: radial-gradient(circle, rgba(220, 235, 255, 0.78) 0%, rgba(220, 235, 255, 0) 70%);
+  }
+  50% {
+    opacity: 1; transform: scale(1.18);
+    background: radial-gradient(circle, rgba(255, 248, 240, 0.9) 0%, rgba(255, 248, 240, 0) 70%);
+  }
+  75% {
+    opacity: 0.78; transform: scale(0.98);
+    background: radial-gradient(circle, rgba(255, 215, 215, 0.82) 0%, rgba(255, 215, 215, 0) 70%);
+  }
+  100% {
+    opacity: 0.45; transform: scale(0.75);
+    background: radial-gradient(circle, rgba(170, 210, 255, 0.7) 0%, rgba(170, 210, 255, 0) 70%);
+  }
 }
 
 @keyframes planet-drift {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-2px); }
+}
+
+@keyframes planet-halo-rotate {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes planet-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1.12); }
 }
 
 .app-title {
@@ -94,15 +245,6 @@ html, body {
   font-style: italic;
   color: var(--text);
   line-height: 1;
-}
-
-.app-subtitle {
-  font-family: var(--font-display);
-  font-size: 12px;
-  font-style: italic;
-  color: var(--text-dim);
-  margin-top: 4px;
-  letter-spacing: 0.01em;
 }
 
 .header-actions {
@@ -154,16 +296,27 @@ html, body {
 
 .status-block {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: -0.005em;
   -webkit-app-region: no-drag;
   margin-top: 0;
-  padding-left: 6px;
+  padding-left: 10px;
   border-left: 1px solid var(--border);
+  max-width: 240px;
+  min-width: 0;
+}
+
+.status-text {
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  line-height: 1.55;
+  padding-top: 1px;
+  flex: 1;
+  min-width: 0;
 }
 
 .status-dot {
@@ -172,6 +325,8 @@ html, body {
   border-radius: 50%;
   background: var(--text-dim);
   transition: background 0.3s, box-shadow 0.3s;
+  flex-shrink: 0;
+  margin-top: 5px;
 }
 
 .status-dot.busy {
@@ -1860,6 +2015,99 @@ pre code.hljs {
 
 .settings-section:last-child {
   margin-bottom: 0;
+}
+
+/* ─── theme picker (settings 모달) ─── */
+.theme-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.theme-option {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 10px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.theme-option:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-elevated);
+}
+
+.theme-option.active {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  box-shadow: 0 0 0 2px var(--accent-bg);
+}
+
+.theme-option.active .theme-label {
+  color: var(--accent-soft);
+}
+
+.theme-swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(127, 127, 127, 0.3);
+  flex-shrink: 0;
+  background-size: cover;
+}
+
+.theme-swatch-dark {
+  background: linear-gradient(135deg, #15130f 50%, #cc785c 50%);
+}
+.theme-swatch-light {
+  background: linear-gradient(135deg, #faf7f1 50%, #b65a3e 50%);
+}
+/* System은 좌/우 dark/light 명시 + 가운데 작은 아이콘 (꺽쇠로 자동 표시) */
+.theme-swatch-system {
+  position: relative;
+  background: linear-gradient(90deg, #15130f 50%, #faf7f1 50%);
+}
+.theme-swatch-system::after {
+  content: '⇆';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: rgba(204, 120, 92, 0.9);
+  font-weight: 600;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+}
+
+.theme-label {
+  font-size: 12px;
+  color: var(--text);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.theme-sub-hint {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-style: italic;
+  line-height: 1;
+  margin-top: -2px;
+}
+
+.settings-field-note {
+  display: block;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 6px;
+  font-style: italic;
+  line-height: 1.5;
 }
 
 .settings-section h3 {

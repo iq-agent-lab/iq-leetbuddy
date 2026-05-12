@@ -57,9 +57,14 @@ copyFile(
   'node_modules/@highlightjs/cdn-assets/highlight.min.js',
   'dist/vendor/highlight.min.js'
 );
+// hljs dark + light 둘 다 복사 — theme 변경 시 dynamic link href 토글
 copyFile(
   'node_modules/@highlightjs/cdn-assets/styles/atom-one-dark.min.css',
-  'dist/vendor/highlight-theme.css'
+  'dist/vendor/highlight-theme-dark.css'
+);
+copyFile(
+  'node_modules/@highlightjs/cdn-assets/styles/atom-one-light.min.css',
+  'dist/vendor/highlight-theme-light.css'
 );
 
 // CodeMirror 5 — 코드 에디터 (통과 코드 입력란)
@@ -73,7 +78,9 @@ copyFile(
 const cmRoot = 'node_modules/codemirror';
 copyFile(`${cmRoot}/lib/codemirror.js`, 'dist/vendor/codemirror/codemirror.js');
 copyFile(`${cmRoot}/lib/codemirror.css`, 'dist/vendor/codemirror/codemirror.css');
+// dark / light 둘 다 복사 — theme 변경 시 CodeMirror.setOption('theme', ...)으로 dynamic
 copyFile(`${cmRoot}/theme/material-darker.css`, 'dist/vendor/codemirror/theme/material-darker.css');
+copyFile(`${cmRoot}/theme/material.css`, 'dist/vendor/codemirror/theme/material.css');
 
 // 언어 모드 — LeetCode에서 자주 쓰는 것 위주
 // clike: C, C++, Java, C#, Kotlin, Scala 모두 포함

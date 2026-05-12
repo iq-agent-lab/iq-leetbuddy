@@ -443,6 +443,90 @@ function closeStats(): void {
   $('stats-modal').classList.add('hidden');
 }
 
+// ─── 테마 (dark / light / system) ────────────────────────────
+// Sepia 옵션은 v0.6.0에서 제거됨 — Dark variant라 가치 모호하고 사용자
+// 피드백상 "이상해" 라서 정리. system이 OS 따라 자동 light/dark.
+const THEME_KEY = 'iq-leetbuddy:theme';
+type Theme = 'dark' | 'light' | 'system';
+type ResolvedTheme = 'dark' | 'light';
+
+function getStoredTheme(): Theme {
+  try {
+    const v = localStorage.getItem(THEME_KEY) as Theme | null;
+    if (v === 'dark' || v === 'light' || v === 'system') return v;
+    // legacy 'sepia' value migrate
+    if (v === 'sepia') return 'dark';
+  } catch {}
+  return 'dark';
+}
+
+function setStoredTheme(t: Theme): void {
+  try {
+    localStorage.setItem(THEME_KEY, t);
+  } catch {}
+}
+
+// system 모드면 OS prefers-color-scheme 따름 (light/dark만)
+function resolveTheme(t: Theme): ResolvedTheme {
+  if (t === 'system') {
+    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  }
+  return t;
+}
+
+function applyTheme(t: Theme): void {
+  const resolved = resolveTheme(t);
+  const html = document.documentElement;
+  html.classList.remove('theme-dark', 'theme-light');
+  html.classList.add(`theme-${resolved}`);
+
+  // hljs theme — 코드블록 색상 (번역/회고)
+  const hljsLink = document.getElementById('hljs-theme-link') as HTMLLinkElement | null;
+  if (hljsLink) {
+    hljsLink.href =
+      resolved === 'light'
+        ? '../vendor/highlight-theme-light.css'
+        : '../vendor/highlight-theme-dark.css';
+  }
+
+  // CodeMirror theme — 통과 코드 에디터
+  if (cmEditor) {
+    cmEditor.setOption('theme', resolved === 'light' ? 'material' : 'material-darker');
+  }
+
+  // 선택된 theme option에 active 표시
+  document.querySelectorAll<HTMLElement>('.theme-option').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.theme === t);
+  });
+
+  // System sub-hint 동적 — 현재 OS가 어느 쪽 따르고 있는지 표시
+  const systemSub = document.getElementById('theme-system-sub');
+  if (systemSub) {
+    if (t === 'system') {
+      systemSub.textContent = `OS 따라 · 현재 ${resolved === 'light' ? 'Light' : 'Dark'}`;
+    } else {
+      systemSub.textContent = 'OS 따라';
+    }
+  }
+}
+
+function initTheme(): void {
+  const stored = getStoredTheme();
+  applyTheme(stored);
+
+  // system 모드면 OS 변경 listen
+  const mql = window.matchMedia('(prefers-color-scheme: light)');
+  const onChange = () => {
+    if (getStoredTheme() === 'system') applyTheme('system');
+  };
+  // legacy + modern API 둘 다 호환
+  if (typeof mql.addEventListener === 'function') {
+    mql.addEventListener('change', onChange);
+  } else if (typeof (mql as any).addListener === 'function') {
+    (mql as any).addListener(onChange);
+  }
+}
+
 // ─── 마지막 선택 언어 기억 ───────────────────────────────────
 const PREFERRED_LANG_KEY = 'iq-leetbuddy:preferred-lang';
 
@@ -904,6 +988,13 @@ async function openSettings(): Promise<void> {
 
   $('pat-help-panel').classList.add('hidden');
   $('verify-result').classList.add('hidden');
+
+  // theme picker active 표시 갱신
+  const currentTheme = getStoredTheme();
+  document.querySelectorAll<HTMLElement>('.theme-option').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.theme === currentTheme);
+  });
+
   const modal = $('settings-modal');
   modal.classList.remove('hidden');
   // closeSettings에서 inline display:none 강제 추가했으면 여기서 제거
@@ -1271,10 +1362,23 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
 });
 
 window.addEventListener('DOMContentLoaded', () => {
+  initTheme(); // localStorage에서 테마 읽어서 즉시 적용 (FOUC 최소화)
   checkConfig();
   renderRecent();
   initCodeEditor();
+  // codeEditor 생성 후 theme 다시 적용 (CodeMirror theme 동기화)
+  applyTheme(getStoredTheme());
   $input('problem-input').focus();
+
+  // theme picker 클릭 — 즉시 적용 + localStorage 저장
+  document.querySelectorAll<HTMLElement>('.theme-option').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const t = btn.dataset.theme as Theme | undefined;
+      if (!t) return;
+      setStoredTheme(t);
+      applyTheme(t);
+    });
+  });
 
   // 진행 상황 listeners
   window.api.onFetchProgress((stage: string) => {
