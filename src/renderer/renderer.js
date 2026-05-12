@@ -54,6 +54,10 @@ function formatShortcutForDisplay(sc) {
     .replace(/\+/g, '');
 }
 
+// 첫 실행(둘 다 미설정) 시 한 번만 자동 모달.
+// 매 부팅 동안 한 번만 — 사용자가 닫아도 같은 세션에선 다시 안 띄움.
+let firstRunPromptShown = false;
+
 async function checkConfig() {
   try {
     const cfg = await window.api.checkConfig();
@@ -69,6 +73,17 @@ async function checkConfig() {
       el.textContent = `설정 필요: ${missing.join(', ')} (⚙️ 클릭)`;
       el.classList.add('warning');
       el.classList.remove('ok');
+
+      // 둘 다 비어있으면 처음 켠 것 — settings 모달 자동 안내
+      if (!cfg.anthropic && !cfg.github && !firstRunPromptShown) {
+        firstRunPromptShown = true;
+        setTimeout(() => {
+          if ($('settings-modal').classList.contains('hidden')) {
+            openSettings();
+            setStatus('처음 설정 — Anthropic API Key와 GitHub Token을 입력해주세요', 'busy');
+          }
+        }, 500);
+      }
     }
     // 단축키 표시
     const scEl = $('shortcut-status');
@@ -228,6 +243,20 @@ const NO_SNIPPET_MESSAGE = `// 이 언어의 시작 코드가 LeetCode에 등록
 //   1) 위에서 다른 언어 선택
 //   2) LeetCode 페이지에서 시작 코드를 직접 복사 → 03 단계에 붙여넣기`;
 
+// 마크다운 렌더링된 영역(번역/회고)의 pre code 블록들에 syntax highlighting 적용.
+// streaming 중 매 청크마다 호출하면 부하 — final HTML 교체 시점에만 한 번 호출.
+function highlightCodeBlocks(container) {
+  if (!container || !window.hljs) return;
+  container.querySelectorAll('pre code').forEach((block) => {
+    delete block.dataset.highlighted;
+    try {
+      window.hljs.highlightElement(block);
+    } catch {
+      // 알 수 없는 언어 등은 plaintext로 떨어짐 — 무시
+    }
+  });
+}
+
 function updateStarterCode() {
   if (!state.problem) return;
   const slug = state.selectedLang;
@@ -275,6 +304,31 @@ function syncCodeScroll() {
   overlay.scrollLeft = ta.scrollLeft;
 }
 
+// credential 부재 에러 패턴 감지 — translator/annotator/github에서 throw하는 메시지에 매칭
+// "ANTHROPIC_API_KEY가 설정되지 않았습니다", "GITHUB_TOKEN이 설정되지 않았습니다", "GITHUB_OWNER 또는 GITHUB_REPO가 설정되지 않았습니다"
+function isCredentialError(msg) {
+  if (!msg) return false;
+  return /API_KEY|GITHUB_TOKEN|GITHUB_OWNER|GITHUB_REPO/i.test(msg) &&
+    /설정되지 않았|미설정|not set/i.test(msg);
+}
+
+// 401 (토큰 무효)도 모달 안내 케이스
+function isAuthError(msg) {
+  if (!msg) return false;
+  return /401|토큰이 유효하지 않/i.test(msg);
+}
+
+function offerSettingsOnCredentialError(msg) {
+  if (!isCredentialError(msg) && !isAuthError(msg)) return false;
+  setStatus('인증 정보가 필요해요 — 설정 모달을 열게요', 'error');
+  setTimeout(() => {
+    if ($('settings-modal').classList.contains('hidden')) {
+      openSettings();
+    }
+  }, 600);
+  return true;
+}
+
 // fetch 실패 시 input border red + shake 애니메이션
 function flashInputError() {
   const el = $('problem-input');
@@ -314,6 +368,7 @@ async function handleFetch() {
 
     // streaming 끝났으니 최종 (안정적인) HTML로 교체
     $('translation-output').innerHTML = result.translationHtml;
+    highlightCodeBlocks($('translation-output'));
     populateLanguageSelect(result.problem.codeSnippets);
 
     showStep(3);
@@ -326,6 +381,7 @@ async function handleFetch() {
     // 에러 시 step-2 다시 숨김 (사용자가 다시 시도하면 streaming 영역 새로)
     $('step-2').classList.add('hidden');
     $('translation-output').innerHTML = '';
+    offerSettingsOnCredentialError(e.message);
   } finally {
     resetButton('fetch-btn', '불러오기');
   }
@@ -354,6 +410,7 @@ function showUploadSuccess(result) {
   if (stream && result.annotatedHtml) {
     stream.innerHTML = result.annotatedHtml;
     stream.classList.remove('streaming'); // 좌측 코랄 라인 제거
+    highlightCodeBlocks(stream);
   }
 
   $('upload-info').innerHTML = `
@@ -421,6 +478,7 @@ async function performUpload() {
       showRepoMissingError(e.message);
     } else {
       showErrorPlain(e.message);
+      offerSettingsOnCredentialError(e.message);
     }
   } finally {
     resetButton('upload-btn', 'AI 회고 생성 후 GitHub에 업로드');
