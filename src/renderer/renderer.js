@@ -86,6 +86,25 @@ async function checkConfig() {
   }
 }
 
+// 마지막 선택 언어 기억 — 사용자가 매번 java→python으로 바꾸는 마찰 제거
+const PREFERRED_LANG_KEY = 'iq-leetbuddy:preferred-lang';
+
+function getPreferredLang() {
+  try {
+    return localStorage.getItem(PREFERRED_LANG_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setPreferredLang(slug) {
+  try {
+    localStorage.setItem(PREFERRED_LANG_KEY, slug);
+  } catch {
+    // localStorage 사용 불가 환경 무시
+  }
+}
+
 function populateLanguageSelect(snippets) {
   const select = $('starter-lang-select');
   select.innerHTML = '';
@@ -112,7 +131,13 @@ function populateLanguageSelect(snippets) {
     select.appendChild(opt);
   });
 
-  const defaultSlug = sorted.find((s) => s.langSlug === 'java')?.langSlug || sorted[0].langSlug;
+  // 우선순위: 마지막 선택 lang → java (보편 default) → 첫 번째
+  // 저장된 lang이 이 문제 snippet에 없으면 fallback
+  const stored = getPreferredLang();
+  const defaultSlug =
+    (stored && sorted.find((s) => s.langSlug === stored)?.langSlug) ||
+    sorted.find((s) => s.langSlug === 'java')?.langSlug ||
+    sorted[0].langSlug;
   select.value = defaultSlug;
   state.selectedLang = defaultSlug;
 
@@ -365,6 +390,7 @@ function reset() {
   $('problem-input').value = '';
   $('problem-input').classList.remove('input-error');
   $('clear-input-btn').classList.add('hidden');
+  $('paste-preview').classList.add('hidden');
   $('code-input').value = '';
   $('translation-output').innerHTML = '';
   $('starter-code').textContent = '';
@@ -537,22 +563,57 @@ $('problem-input').addEventListener('keypress', (e) => {
   if (e.key === 'Enter') handleFetch();
 });
 
+// src/util/language.ts의 parseProblemInput과 동일 로직 (renderer는 contextIsolation으로 import 불가)
+// URL 정규화 결과를 input 아래에 미리보기로 표시 — 정규화가 원본과 다를 때만
+function parseProblemInputClient(input) {
+  const trimmed = input.trim();
+  const urlPattern = /leetcode\.(?:com|cn)\/problems\/([a-zA-Z0-9-]+)/i;
+  const urlMatch = trimmed.match(urlPattern);
+  if (urlMatch) return urlMatch[1].toLowerCase();
+  return trimmed
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function updatePastePreview() {
+  const raw = $('problem-input').value.trim();
+  const preview = $('paste-preview');
+  if (!raw) {
+    preview.classList.add('hidden');
+    return;
+  }
+  const slug = parseProblemInputClient(raw);
+  // 빈 slug거나 raw와 동일하면 미리보기 무의미 → hide
+  if (!slug || slug === raw.toLowerCase()) {
+    preview.classList.add('hidden');
+    return;
+  }
+  preview.innerHTML = `<span class="preview-arrow">→</span><span class="preview-slug">${slug}</span> 으로 정규화`;
+  preview.classList.remove('hidden');
+}
+
 // input clear(×) 버튼: input value 있을 때만 visible
 $('problem-input').addEventListener('input', () => {
   const hasValue = $('problem-input').value.length > 0;
   $('clear-input-btn').classList.toggle('hidden', !hasValue);
   // 사용자가 입력 중이면 에러 상태 제거
   if (hasValue) $('problem-input').classList.remove('input-error');
+  updatePastePreview();
 });
 
 $('clear-input-btn').addEventListener('click', () => {
   $('problem-input').value = '';
   $('problem-input').classList.remove('input-error');
   $('clear-input-btn').classList.add('hidden');
+  $('paste-preview').classList.add('hidden');
   $('problem-input').focus();
 });
 $('starter-lang-select').addEventListener('change', (e) => {
   state.selectedLang = e.target.value;
+  setPreferredLang(e.target.value); // 다음 fetch에서도 같은 언어로 시작
   updateStarterCode();
   updateCodeHighlight(); // 통과 코드도 같은 언어로 hl 갱신
 });
@@ -592,6 +653,7 @@ async function handlePullFromEmbed() {
     }
     $('problem-input').value = r.url;
     $('clear-input-btn').classList.remove('hidden');
+    updatePastePreview();
     handleFetch();
   } catch (e) {
     setStatus(`가져오기 실패: ${e.message}`, 'error');
@@ -655,6 +717,7 @@ window.addEventListener('DOMContentLoaded', () => {
   window.api.onPullProblem((url) => {
     $('problem-input').value = url;
     $('clear-input-btn').classList.remove('hidden');
+    updatePastePreview();
     handleFetch();
   });
 });

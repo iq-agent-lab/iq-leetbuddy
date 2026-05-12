@@ -92,6 +92,7 @@
           </button>
           <button id="fetch-btn" class="primary"><span class="btn-content">불러오기</span></button>
         </div>
+        <div class="paste-preview hidden" id="paste-preview"></div>
       </div>
     </section>
 
@@ -161,7 +162,11 @@
         <button class="modal-close" id="close-settings" aria-label="닫기">×</button>
       </header>
       <div class="modal-body">
-        <p class="modal-hint">키 자체는 화면에 노출하지 않아. 새 값을 입력하면 그것으로 갱신되고, 비워두면 기존 값 그대로 유지돼. 저장 시 <code>.env</code>에 기록.</p>
+        <ul class="modal-hint">
+          <li>저장된 키는 보안을 위해 화면에 노출되지 않아</li>
+          <li>새 값을 입력하면 그 값으로 갱신</li>
+          <li>비워두면 기존 값 그대로 유지</li>
+        </ul>
 
         <section class="settings-section">
           <h3>
