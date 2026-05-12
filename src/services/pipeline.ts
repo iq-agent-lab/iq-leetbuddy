@@ -1,6 +1,6 @@
 // 파이프라인 오케스트레이션
 
-import { fetchProblem } from './leetcode';
+import { fetchProblem, resolveTitleSlugByFrontendId } from './leetcode';
 import { translateProblem, StreamCallback } from './translator';
 import { annotateCode } from './annotator';
 import { uploadSolution, createRepoIfMissing } from './github';
@@ -16,17 +16,30 @@ export async function fetchAndTranslate(
   onProgress?: ProgressFn,
   onStream?: StreamCallback
 ): Promise<FetchProblemResult> {
-  const titleSlug = parseProblemInput(input);
+  const parsed = parseProblemInput(input);
+
+  // 숫자 입력 (예: "1") — frontendId → slug 해결 후 진행
+  let titleSlug = parsed.titleSlug;
+  const isCN = parsed.isCN;
+  if (parsed.isNumericId && parsed.frontendId) {
+    onProgress?.('resolving');
+    titleSlug = await resolveTitleSlugByFrontendId(parsed.frontendId, isCN);
+  }
+
+  if (!titleSlug) {
+    throw new Error('입력에서 문제 식별자를 찾지 못했어요 — URL/slug/문제 이름/번호 중 하나를 입력해주세요');
+  }
 
   // 캐시 hit 시 LLM 호출 skip — chip 재클릭 / 같은 문제 다른 언어로 풀 때 즉시 로드
-  const cached = await readTranslationCache(titleSlug);
+  // cn 도메인은 별도 캐시 키 (com/cn 번역 다를 수 있음)
+  const cached = await readTranslationCache(titleSlug, isCN);
   if (cached) {
     onProgress?.('cached');
     return cached;
   }
 
   onProgress?.('fetching');
-  const problem = await fetchProblem(titleSlug);
+  const problem = await fetchProblem(titleSlug, isCN);
 
   onProgress?.('translating');
   const translation = await translateProblem(problem, onStream);
@@ -34,7 +47,7 @@ export async function fetchAndTranslate(
 
   const result = { problem, translation, translationHtml };
   // 캐시 쓰기 실패해도 흐름엔 영향 X — fire-and-forget OK이지만 await로 순서 보장
-  await writeTranslationCache(titleSlug, result);
+  await writeTranslationCache(titleSlug, result, isCN);
   return result;
 }
 

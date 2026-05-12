@@ -358,6 +358,13 @@ html, body {
   color: var(--accent-soft);
 }
 
+.paste-preview .preview-cn {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-left: 4px;
+  font-style: italic;
+}
+
 .paste-preview.hidden {
   display: none;
 }

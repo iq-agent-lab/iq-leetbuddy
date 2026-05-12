@@ -84,22 +84,48 @@ export async function withRetry<T>(
 //   - https://leetcode.com/problems/two-sum/description/
 //   - https://leetcode.com/problems/validate-binary-search-tree/description/?envType=problem-list-v2&envId=depth-first-search
 //   - leetcode.com/problems/two-sum
+//   - leetcode.cn/problems/two-sum         (cn 도메인은 cn GraphQL endpoint 사용)
 //   - Symmetric Tree         (대소문자/공백 자유)
 //   - symmetric tree
 //   - SYMMETRIC-TREE
-export function parseProblemInput(input: string): string {
+//   - 1, 2024                (숫자만이면 frontendId — leetcode.ts에서 별도 해결)
+export interface ParsedInput {
+  /** 정규화된 slug. 숫자 입력이면 빈 문자열 + isNumericId=true */
+  titleSlug: string;
+  /** leetcode.cn 도메인 URL이었으면 true → cn GraphQL endpoint 사용 */
+  isCN: boolean;
+  /** 입력이 숫자만인 경우 (예: "1") — main 측에서 GraphQL로 frontendId → slug 해결 */
+  isNumericId: boolean;
+  /** isNumericId일 때 원본 숫자 (예: "1") */
+  frontendId: string | null;
+}
+
+export function parseProblemInput(input: string): ParsedInput {
   const trimmed = input.trim();
 
-  // URL 패턴 매칭 - leetcode.com/cn, http(s) 선택, query/path 뒤는 무시
-  const urlPattern = /leetcode\.(?:com|cn)\/problems\/([a-zA-Z0-9-]+)/i;
+  // 숫자만 — frontendId로 해결 (예: "1", "2024")
+  if (/^\d+$/.test(trimmed)) {
+    return { titleSlug: '', isCN: false, isNumericId: true, frontendId: trimmed };
+  }
+
+  // URL 패턴 매칭 — leetcode.com/cn, http(s) 선택, query/path 뒤는 무시
+  const urlPattern = /leetcode\.(com|cn)\/problems\/([a-zA-Z0-9-]+)/i;
   const urlMatch = trimmed.match(urlPattern);
-  if (urlMatch) return urlMatch[1].toLowerCase();
+  if (urlMatch) {
+    return {
+      titleSlug: urlMatch[2].toLowerCase(),
+      isCN: urlMatch[1].toLowerCase() === 'cn',
+      isNumericId: false,
+      frontendId: null,
+    };
+  }
 
   // 자유 텍스트 → slug 정규화
-  return trimmed
+  const slug = trimmed
     .toLowerCase()
     .replace(/[\s_]+/g, '-')        // 공백/언더스코어 → dash
     .replace(/[^a-z0-9-]/g, '')     // 영숫자/dash만 남김
     .replace(/-+/g, '-')            // 연속 dash 하나로
     .replace(/^-+|-+$/g, '');       // 양끝 dash 제거
+  return { titleSlug: slug, isCN: false, isNumericId: false, frontendId: null };
 }

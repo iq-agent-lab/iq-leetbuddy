@@ -16,6 +16,7 @@ const $ta = (id: string) => $<HTMLTextAreaElement>(id);
 
 // ─── progress 메시지 ─────────────────────────────────────────
 const FETCH_PROGRESS_TEXT: Record<string, string> = {
+  resolving: '문제 번호로 검색 중...',
   fetching: 'LeetCode에서 문제 가져오는 중...',
   translating: '한국어로 번역 중...',
   cached: '캐시에서 즉시 로드',
@@ -749,17 +750,41 @@ async function handleVerifyGithub(): Promise<void> {
 
 // ─── parseProblemInput client (paste preview) ────────────────
 // src/util/language.ts의 parseProblemInput과 동일 로직 (renderer는 import 불가)
-function parseProblemInputClient(input: string): string {
+// 숫자 입력은 client에서 미리보기만 — 실제 해결은 main의 GraphQL 호출
+interface ClientParsed {
+  kind: 'slug' | 'numeric' | 'empty';
+  value: string;
+  isCN: boolean;
+}
+
+function parseProblemInputClient(input: string): ClientParsed {
   const trimmed = input.trim();
-  const urlPattern = /leetcode\.(?:com|cn)\/problems\/([a-zA-Z0-9-]+)/i;
+  if (!trimmed) return { kind: 'empty', value: '', isCN: false };
+
+  // 숫자만 — frontendId
+  if (/^\d+$/.test(trimmed)) {
+    return { kind: 'numeric', value: trimmed, isCN: false };
+  }
+
+  // URL
+  const urlPattern = /leetcode\.(com|cn)\/problems\/([a-zA-Z0-9-]+)/i;
   const urlMatch = trimmed.match(urlPattern);
-  if (urlMatch) return urlMatch[1].toLowerCase();
-  return trimmed
+  if (urlMatch) {
+    return {
+      kind: 'slug',
+      value: urlMatch[2].toLowerCase(),
+      isCN: urlMatch[1].toLowerCase() === 'cn',
+    };
+  }
+
+  // 자유 텍스트
+  const slug = trimmed
     .toLowerCase()
     .replace(/[\s_]+/g, '-')
     .replace(/[^a-z0-9-]/g, '')
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '');
+  return { kind: 'slug', value: slug, isCN: false };
 }
 
 function updatePastePreview(): void {
@@ -769,13 +794,29 @@ function updatePastePreview(): void {
     preview.classList.add('hidden');
     return;
   }
-  const slug = parseProblemInputClient(raw);
-  if (!slug || slug === raw.toLowerCase()) {
-    preview.classList.add('hidden');
+
+  const parsed = parseProblemInputClient(raw);
+
+  // 숫자 입력 — frontendId 검색 미리 안내
+  if (parsed.kind === 'numeric') {
+    preview.innerHTML = `<span class="preview-arrow">→</span><span class="preview-slug">문제 #${parsed.value}</span> 으로 검색`;
+    preview.classList.remove('hidden');
     return;
   }
-  preview.innerHTML = `<span class="preview-arrow">→</span><span class="preview-slug">${slug}</span> 으로 정규화`;
-  preview.classList.remove('hidden');
+
+  // slug — 원본과 다르면 정규화 결과 표시
+  if (parsed.kind === 'slug') {
+    if (!parsed.value || parsed.value === raw.toLowerCase()) {
+      preview.classList.add('hidden');
+      return;
+    }
+    const cnNote = parsed.isCN ? ' <span class="preview-cn">(cn)</span>' : '';
+    preview.innerHTML = `<span class="preview-arrow">→</span><span class="preview-slug">${parsed.value}</span>${cnNote} 으로 정규화`;
+    preview.classList.remove('hidden');
+    return;
+  }
+
+  preview.classList.add('hidden');
 }
 
 // ─── pull from embed ─────────────────────────────────────────
