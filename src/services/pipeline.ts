@@ -5,6 +5,7 @@ import { translateProblem, StreamCallback } from './translator';
 import { annotateCode } from './annotator';
 import { uploadSolution, createRepoIfMissing } from './github';
 import { renderMarkdown } from './markdown';
+import { readTranslationCache, writeTranslationCache } from './cache';
 import { parseProblemInput } from '../util/language';
 import { FetchProblemResult, UploadResult, LeetCodeProblem } from '../types';
 
@@ -15,14 +16,26 @@ export async function fetchAndTranslate(
   onProgress?: ProgressFn,
   onStream?: StreamCallback
 ): Promise<FetchProblemResult> {
-  onProgress?.('fetching');
   const titleSlug = parseProblemInput(input);
+
+  // 캐시 hit 시 LLM 호출 skip — chip 재클릭 / 같은 문제 다른 언어로 풀 때 즉시 로드
+  const cached = await readTranslationCache(titleSlug);
+  if (cached) {
+    onProgress?.('cached');
+    return cached;
+  }
+
+  onProgress?.('fetching');
   const problem = await fetchProblem(titleSlug);
 
   onProgress?.('translating');
   const translation = await translateProblem(problem, onStream);
   const translationHtml = await renderMarkdown(translation);
-  return { problem, translation, translationHtml };
+
+  const result = { problem, translation, translationHtml };
+  // 캐시 쓰기 실패해도 흐름엔 영향 X — fire-and-forget OK이지만 await로 순서 보장
+  await writeTranslationCache(titleSlug, result);
+  return result;
 }
 
 export async function annotateAndUpload(

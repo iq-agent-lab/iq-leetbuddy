@@ -5,6 +5,7 @@ const $ = (id) => document.getElementById(id);
 const FETCH_PROGRESS_TEXT = {
   fetching: 'LeetCode에서 문제 가져오는 중...',
   translating: '한국어로 번역 중...',
+  cached: '캐시에서 즉시 로드',
 };
 
 const UPLOAD_PROGRESS_TEXT = {

@@ -1,25 +1,23 @@
-# CLAUDE.md — convo·trace 작업 컨텍스트
+# CLAUDE.md — iq-leetbuddy 작업 컨텍스트
 
-> 외부 청자용은 README. 이 파일은 **작업 컨텍스트** (어떻게 작업·왜 이 결정·다음 어디로).
+> 외부 사용자용은 README. 이 파일은 **Claude 세션 작업 컨텍스트** (어떻게 작업·왜 이 결정·다음 어디로).
 >
-> **마지막 업데이트**: 2026-05-08 (마이크로 fix #3 직후, v2 재구성)
+> **마지막 업데이트**: 2026-05-12
 
-**기호**: ✦ 시그니처 / ✓ 유지 / ❌ 하지 말 것 / ~~취소선~~ = 결정상 안 함
+**기호**: ✦ 시그니처 / ✓ 유지 / ❌ 하지 말 것
 
 ---
 
 ## 프로젝트 한눈에
 
-영어 회화 학습 모먼트 박제 도구. **Saga-Tales venture studio의 두 번째 tale.**
-ChatGPT/Claude로 회화하면 끝나면 다 휘발된다는 페인을 직접 해결. 핵심 차별화는 **회상 폐쇄 루프** — 박제된 표현이 다음 회화에 자연스럽게 다시 등장.
+LeetCode 풀이를 **한국어로 번역**해 보여주고, 통과한 코드에 **AI 회고**를 붙여 **GitHub에 단일 commit으로 자동 정리**하는 **Electron 데스크톱 에이전트**.
 
-- **로컬**: `/Users/ibm514/Saga-Tales/tale-02-convo-trace-iq`
-- **GitHub**: https://github.com/Saga-Tales/tale-02-convo-trace-iq
-- **Live**: https://saga-tales.github.io/tale-02-convo-trace-iq/
-- **Studio prologue**: https://github.com/Saga-Tales/prologue
-- **Tale-01 참조**: `/Users/ibm514/Saga-Tales/tale-01-personal-diary-iq`
+**iq-agent-lab 행성 중 하나** — 매일 문제 풀이를 *기록 가능한 학습 자산*으로 바꾸는 것이 이 행성의 일.
 
-Stack: Vite + React + TypeScript + Tailwind v4 + IndexedDB(Dexie) + BYOK + GH Pages + PWA.
+- **로컬**: `/Users/ibm514/iq-lab/iq-agent-lab/iq-leetbuddy`
+- **GitHub**: https://github.com/iq-agent-lab/iq-leetbuddy
+
+Stack: Electron + TypeScript + Anthropic SDK (streaming) + Octokit (git data API) + marked + highlight.js. Renderer는 vanilla JS.
 
 ---
 
@@ -27,65 +25,51 @@ Stack: Vite + React + TypeScript + Tailwind v4 + IndexedDB(Dexie) + BYOK + GH Pa
 
 새 Claude 세션은 이 순서로 부트업:
 
-1. `git status`, `git log -5` — 현재 상태 / 마지막 사이클 확인
-2. `npm install`, `npm run dev` — 동작 확인 (.npmrc에 `ignore-scripts=true`)
-3. **STOP 트리거** + **결정 매트릭스** 훑기 (아래) — 사용자 의견 명시 결정 재확인
+1. `git status`, `git log -5` — 현재 상태 / 최근 사이클 확인
+2. `npm install` (필요 시) — 첫 부트 후엔 보통 skip
+3. **STOP 트리거** + **결정 매트릭스** 훑기 (아래) — 명시 결정 재확인
 4. 무엇을 할지 사용자와 합의 — 다음 단계 후보에서 선택
-5. `npx tsc -b && npx vite build` — 통과해야 zip 생성
-6. **Saga-Tales 표준 사이클** (zip → unzip → push), **한국어 커밋 메시지**
+5. `npx tsc --noEmit && npm run build` — 통과 확인
+6. **한국어 커밋 메시지**, 작은 라운드 묶음 패턴
 
 ---
 
 ## 개발 명령
 
 ### 로컬 개발
+
 ```bash
-cd /Users/ibm514/Saga-Tales/tale-02-convo-trace-iq
 npm install
-npm run dev      # http://localhost:5173/tale-02-convo-trace-iq/
+npm run build       # tsc + copy-assets.js
+npm start           # build + electron (--dev로 DevTools detach)
 ```
 
-### 빌드 검증 (zip 만들기 전 필수)
-```bash
-npx tsc -b       # 타입체크 — 에러 0
-npx vite build   # 성공해야 함 (warning은 OK)
-```
-
-### Saga-Tales 표준 한 사이클
+### 배포
 
 ```bash
-# Anthropic Claude 측 (zip 생성):
-cd /home/claude/tale-02-convo-trace-iq && rm -rf node_modules dist *.tsbuildinfo
-cd /home/claude && rm -f tale-02-convo-trace-iq.zip
-zip -r tale-02-convo-trace-iq.zip tale-02-convo-trace-iq -x "*.DS_Store" "*/node_modules/*" "*/dist/*"
-mv tale-02-convo-trace-iq.zip /mnt/user-data/outputs/
-# present_files로 사용자에게 전달
-
-# 사용자 로컬 측:
-cd /Users/ibm514/Saga-Tales/tale-02-convo-trace-iq && git status
-unzip -q ~/Downloads/tale-02-convo-trace-iq.zip -d ~/Downloads/ \
-  && cp -R ~/Downloads/tale-02-convo-trace-iq/. /Users/ibm514/Saga-Tales/tale-02-convo-trace-iq/ \
-  && rm -rf ~/Downloads/tale-02-convo-trace-iq && rm -f ~/Downloads/tale-02-convo-trace-iq.zip
-npm install && npm run dev
-git add . && git commit -m "한국어 메시지" && git push
+npm run dist:mac           # macOS .zip (arm64 + x64)
+npm run dist:mac-universal # universal binary
+npm run dist:win           # Windows NSIS
+npm run dist:linux         # Linux AppImage
+npm run release            # version patch + push + GitHub Actions
 ```
 
 ---
 
 ## STOP 트리거
 
-**아래 패턴 감지하면 멈추고 결정 매트릭스의 해당 결정을 사용자에게 보여주고 재확인.** 표면적으로 합리적으로 들리지만 명시적 결정과 충돌하는 요청들:
+**아래 패턴 감지하면 멈추고 결정 매트릭스의 해당 결정을 사용자에게 보여주고 재확인.** 표면적으로 합리적이지만 명시 결정과 충돌하는 요청들:
 
 | 트리거 키워드 | 충돌하는 결정 |
 |---|---|
-| "리뷰 페이지" / "복습 페이지" / "누적 정리" | 누적 리뷰 안 만듦 |
-| "LLM으로 mastery 판정" / "회상 정확도 LLM으로 올리자" | LLM 호출 회피 |
-| "페어 turn 25-40으로 좁히자" / "4-phase 강제하자" | 마이크로 #3 자율성 |
-| "백엔드 추가" / "서버" / "DB on cloud" / "analytics" / "tracking" | BYOK + serverless |
-| "iOS 자동 PWA 설치 버튼" | Apple 정책상 JS trigger 불가 |
-| "양방향 P2P 동기화" | 호스트 중심 모델 |
-| "primary 컬러 다른 색으로" / "rounded-2xl 말고 다른 radius" | 디자인 v2 정체성 |
-| "금요일 스피치 모드" / "요일별 테마" | 명시 보류 |
+| ".env 사용자에게 노출" / "config 경로 표시" | UI에 환경 변수/시크릿 명칭 노출 안 함 |
+| "한 번에 한 파일씩 commit" | 단일 commit per 풀이 (Octokit git data API) |
+| "non-streaming만" / "spinner로 충분" | Streaming 유지 (체감 UX 결정적) |
+| "java 고정 default" | localStorage로 마지막 lang 기억 |
+| "renderer에 marked 추가" | main에서 marked.parse, IPC로 HTML push |
+| "LeetCode UI 자동화 완벽히" | best-effort + 토스트 fallback |
+| "임베드에 preload 추가" | preload 없이 console-message sentinel |
+| "history 누적 무한" | localStorage 5개 LRU + dedup |
 
 ---
 
@@ -93,20 +77,24 @@ git add . && git commit -m "한국어 메시지" && git push
 
 각 결정의 *왜* 만 여기 (코드에 없으니까). *언제/누가* 는 `git log`.
 
-| 결정 | 상태 | Why | Anchor |
-|---|---|---|---|
-| 누적 리뷰 페이지 | 안 만듦 | 회상 폐쇄 루프(박제→자동등장→mastery)가 이미 누적 리뷰 역할. 별도 페이지는 의식적 review 강제 → 본질 깨뜨림 | "누적 리뷰는 알아서 하는 게 낫지 않나?" (사용자) |
-| 금요일 숏 스피치 모드 | 보류 | 시나리오 모델(dialogue)과 모놀로그+3-Question Rule 형식 부적합 | "일단 금요일 모드 안 만들게" (사용자) |
-| 요일별 테마 (월/수/금) | 보류 | 월·수는 현재 페어 모드로 커버. 금만 새 형식인데 보류. 동아리 운영 vs 도구 결합도 낮춤 | 사용자 명시 |
-| LLM mastery 판정 | 안 함 | API 비용 + 회화 종료 후 판정 지연. substring 4글자/50% 매칭으로 충분, dogfooding 검증 | 초기 설계 + dogfooding |
-| 정통 SM-2 (ef·interval·repetitions) | 안 함 | 게임화 부담(점수 chase). mastery 0-10 단일 스케일이 직관. 명시 review UI 없으니 정교 SRS 불필요 | 초기 설계 |
-| 양방향 P2P 동기화 | 안 함 | N(N-1) vs 2(N-1) 스캔 (3명: 6→4). 호스트=마스터노트 모델 명확 | 초기 설계 |
-| QR raw JSON | 안 함 | 4KB 한도 초과 (시나리오+캡처 ~4.5KB). pako gzip+base64+'CT1' magic으로 ~1.5KB | 한도 측정 |
-| 페어 25-40 turn 강제 cap | 풀음 | cookie cutter (쇼핑에 4-phase 부자연 / 깊은 토론에 25 빈약). 8-50 LLM 자율로 변경 | 마이크로 #3, "상황마다 좀 바뀔 수도 있어서 확장성 여는 게 맞다" (사용자) |
-| 4-phase 모든 페어 강제 | 풀음 | 짧은 거래 회화엔 부자연. 20+ turns 권장으로 | 마이크로 #3 |
-| iOS 자동 PWA 설치 버튼 | 안 함 | Apple 정책상 JS trigger 절대 불가 → 사용자 혼란만 야기 | 플랫폼 제약 |
-| 백엔드 / analytics / tracking | 추가 X | BYOK + serverless가 정체성. 사용자 데이터 외부 전송 X | 초기 설계 |
-| vibrant pink primary | 유지 | 디자인 v2 정체성 (`#ec4899`) | Day 4 리뉴얼 |
+| 결정 | 상태 | Why |
+|---|---|---|
+| 단일 commit per 풀이 | 유지 | `createOrUpdateFileContents`는 파일당 1 commit. git data API(getRef→getCommit→createBlob→createTree→createCommit→updateRef)로 3파일 1 commit |
+| 자동 레포 생성 + 1회 재시도 | 유지 | 404 시 `createRepoIfMissing` + 1.5s propagation wait + retry. annotated 결과 재사용으로 AI 비용 추가 X |
+| 시크릿 UI 노출 X | 유지 | `hasAnthropicKey`/`hasGithubToken` flag만. `.env` 같은 구현 단어 사용자에게 노출 안 함 |
+| .env 저장 위치 분리 | 유지 | dev: 프로젝트 루트, packaged: `userData/.env` (asar read-only 회피) |
+| 영속 LeetCode 세션 | 유지 | `session.fromPartition('persist:leetcode')` — 한 번 로그인하면 다음 실행까지 유지 |
+| 임베드 push: console-message sentinel | 유지 | preload 추가 없이 LeetCode 페이지 JS와 격리. `console.log(SENTINEL + url)` → main의 `console-message`로 캡처 |
+| 원문 클릭 시 lang은 URL hash | 유지 | `#leetbuddy-lang=java`로 전달. INJECT_SCRIPT가 hash 읽어 토스트(확정) + DOM 조작(best-effort) |
+| Lang dropdown 자동 클릭 | best-effort | LeetCode UI 변경에 fragile. 토스트는 항상 표시 → 실패해도 무해 |
+| Streaming (translate/annotate) | 유지 | spinner 30s+ → 즉시 점진 표시. throttle 120ms + renderPromise 체인으로 marked.parse race 없음 |
+| 시작 언어 기억 | 유지 | `localStorage['iq-leetbuddy:preferred-lang']`. 우선순위: 저장 → java → 첫 번째 |
+| 최근 풀이 5개 chips | 유지 | `localStorage['iq-leetbuddy:recent-problems']` LRU. fetch 성공 시 자동 추가, dedup |
+| README 중복 commit skip | 유지 | `fileNeedsUpdate`로 base64 decode + trim 비교. 같으면 commit files에서 제외. solution/RETROSPECTIVE는 항상 |
+| 첫 실행 자동 settings | 유지 | Anthropic + GitHub 둘 다 미설정 시 0.5s 자동 모달. 세션당 한 번 |
+| Credential 에러 자동 모달 | 유지 | `offerSettingsOnCredentialError` — API_KEY/TOKEN 누락 또는 401 시 자동 모달 안내 |
+| 단일 모델 commit hist 한국어 | 유지 | 사용자 한국어 first |
+| Renderer vanilla JS | 임시 | 작은 규모, TS 마이그레이션은 큰 사이클 별도 |
 
 새 결정 추가 시: 이 표 + 필요하면 STOP 트리거 두 곳만 update. **한 결정은 한 곳에서만 진술.**
 
@@ -114,121 +102,80 @@ git add . && git commit -m "한국어 메시지" && git push
 
 ## 핵심 메커니즘
 
-### 1. 회상 폐쇄 루프 — tale-02 핵심 차별화
+### 1. 파이프라인 흐름
 
 ```
-[회화 #1] phrase 박제 → mastery=0
+[step-1] input (URL/slug/name/chip) → parseProblemInput → titleSlug
        ↓
-[회화 #2 시작] selectRecallPhrases (mastery 낮고 nextReviewAt 만료된 top 3)
+[GraphQL fetch] LeetCode questionData (로그인 불필요, public 데이터)
        ↓
-[scenario.ts prompt] recallPhrases를 hint로 주입 ("강제 X, 자연스럽게")
+[step-2] Claude streaming translate → translation-output 점진 갱신
+       ↓ [사용자가 LeetCode에서 직접 풀이]
+[step-3] 통과 코드 붙여넣기 → 시작 언어는 last-used 자동
        ↓
-[LLM이 시나리오에 자연스럽게 녹임]
+[step-4] Claude streaming annotate → annotation-stream 점진 갱신
        ↓
-[회화 진행 → 종료 후 자동 mastery 업데이트]
-  - user turns에 키워드 매칭 → 'used' (mastery +2)
-  - 시나리오 텍스트 매칭만 → 'seen' (mastery +1)
-  - 둘 다 X → 변화 없음
+[GitHub] Octokit git data API → 1 commit (3 files)
+       ↓
+upload-info에 폴더 + commit URL + "다음 문제" 버튼
 ```
 
-본질: **substring keyword match** (4글자 이상 키워드, threshold 비율 매칭). 정확한 비율은 [src/lib/recall.ts](file:///Users/ibm514/Saga-Tales/tale-02-convo-trace-iq/src/lib/recall.ts) 참조.
+### 2. 임베드 LeetCode 양방향 URL 전달
 
-설계 원칙:
-- 1시간 이내 캡처는 회상 후보 제외 (자연스러움 보장)
-- SM-2 단순화 (mastery 0-10 + nextReviewAt만)
+- **Push (임베드 → 메인)** — 3 경로:
+  - 임베드 윈도우 우하단 코랄 chip
+  - 메뉴바 `Cmd+Shift+Return`
+  - INJECT_SCRIPT가 SPA 라우팅 대응 (1.2s interval polling)
+- **Pull (메인 → 임베드)**:
+  - input 옆 "↩ 임베드에서" 버튼
+  - `leetcodeWindow.webContents.getURL()`
 
-### 2. 페어 모드 호스트 중심 동기화
+3개 진입점 모두 `pullToMainWindow(url)` 통일. 메인 윈도우 없으면 `createWindow` + `ready-to-show` 대기 + `did-finish-load` 후 메시지 전송 (DOM listener 부착 전 유실 방지).
 
-3명 시 4번 스캔 (양방향 6번 대비 절약):
+### 3. Streaming
 
-```
-시작:    호스트 QR → 게스트 N-1명 찍음          (N-1번)
-회화:    음성 직접, 각자 디바이스 캡처
-종료:    게스트 N-1명 자기 캡처 QR → 호스트     (N-1번)
-         호스트 통합본 QR → 게스트 N-1명 찍음   (N-1번)
-종료 동기화 합계: 2(N-1)
-```
+- translator/annotator의 `stream.on('text', (delta, snapshot))` → snapshot 콜백
+- main의 `makeStreamForwarder`가 **120ms throttle** + `renderPromise = renderPromise.then(...)` 체인으로 marked.parse race 없음
+- IPC로 HTML push → renderer `innerHTML` 갱신
+- final 단계에서 `result.translationHtml` / `annotatedHtml`로 한 번 더 교체 (incomplete markdown 정리, 안정성)
+- streaming 중엔 hljs skip, final 시점에만 `highlightCodeBlocks()` 호출
 
-설계 원칙:
-- `sessionUuid` 매칭 검증으로 다른 회화 QR 잘못 찍기 방지
-- 받은 share는 `[expressionEn+intentKo]` 복합 unique 인덱스로 dedup
-- `source='imported'` 마킹 (인덱스 안 됨, 메타데이터 용도)
-- `MAX_ITEMS` cap + pako gzip + 'CT1' magic prefix — 정확한 값은 [src/lib/share.ts](file:///Users/ibm514/Saga-Tales/tale-02-convo-trace-iq/src/lib/share.ts)
+### 4. 원문 클릭 시 lang 자동 안내
 
-### 3. 페어 시나리오 자율성 (마이크로 #3)
+- renderer가 `[원문]` 클릭 → URL hash `#leetbuddy-lang=${slug}` 추가
+- 임베드 INJECT_SCRIPT의 `ensureLangHint`가 hash 읽음
+- **토스트** (확정 동작) — 우상단 5초
+- **best-effort DOM 조작** — `trySwitchLang(display)`이 `Python3/Java/...` 텍스트 매칭으로 dropdown button 찾아 클릭, ~7.5s 재시도
+- LeetCode UI 변경에 fragile, 실패해도 무해
 
-이전: 25-40 turns + 4-phase **강제** → cookie cutter
-현재: **8-50 turns LLM 자율** + 4-phase는 20+ turns 권장
+### 5. BYOK (Bring Your Own Key)
 
-[src/lib/scenario.ts](file:///Users/ibm514/Saga-Tales/tale-02-convo-trace-iq/src/lib/scenario.ts):
-- `validateScenario(raw, mode)` — mode별 다른 cap (솔로 3-10 / 페어 8-50)
-- 균형 검증: 한쪽 80% 이상만 reject (인터뷰 70:30 등 허용)
-- prompt에 상황별 권장 분량 hint (거래성 / 잡담 / 면접 / 깊은 토론)
-- ScenarioPreview의 phase 마커는 20+ turns 한정 표시
-- max-h scroll은 15+ turns일 때만
-
-### 4. BYOK + serverless
-
-- API 키: `localStorage('convo-trace-api-key')`
-- 데이터: IndexedDB (Dexie)
-- 외부 통신: Anthropic API + Google Fonts/jsdelivr CDN만
-- 백엔드/분석/광고 없음
-- PWA SW도 BYOK 유지: Anthropic API는 NetworkOnly로 가로채지 않음
-- 백업은 사용자 디바이스 → 사용자 디바이스만 (클라우드 X)
-
-### 5. PWA 설치 UX (마이크로 #2)
-
-[src/lib/pwa.ts](file:///Users/ibm514/Saga-Tales/tale-02-convo-trace-iq/src/lib/pwa.ts) — `usePWAInstall` + `detectPlatform`:
-- **iOS Safari**: JS trigger 절대 불가 → 3단계 수동 가이드 강조
-- **Android Chrome / Desktop Chrome·Edge**: `beforeinstallprompt` 이벤트 잡아서 native prompt
-- **이미 설치**: standalone 감지 → "✓ 이미 설치됨"
-- iPadOS 13+ 데스크탑 위장: `navigator.maxTouchPoints > 1 && /Macintosh/`
+- Anthropic API Key + GitHub PAT 직접 입력
+- 저장: dev 모드 프로젝트 루트 `.env`, packaged 모드 `userData/.env`
+- UI에 시크릿 노출 안 함 (`hasXxx` flag로 존재만 표시)
+- 첫 실행 시 자동 settings prompt
+- credential 에러 시 자동 모달 안내
 
 ---
 
 ## 아키텍처
 
-### 주요 진입점 (전체 트리는 `tree -L 3 src` 또는 직접 ls)
-
 | 파일 | 역할 |
 |---|---|
-| `src/db/schema.ts` | Dexie v4, 마이그레이션 history |
-| `src/lib/recall.ts` | 회상 폐쇄 루프 핵심 (substring match, mastery 분포) |
-| `src/lib/scenario.ts` | 시나리오 생성 + recall hint 주입 + 모드별 prompt |
-| `src/lib/share.ts` | QR 페이로드 (pako gzip, magic 'CT1') |
-| `src/lib/sync.ts` | 받은 share dedup 머지 |
-| `src/lib/pwa.ts` | usePWAInstall + detectPlatform |
-| `src/pages/Chat.tsx` | 호스트/게스트 흐름 분기 + state machine |
-| `src/pages/Home.tsx` | 스트릭 + 회상 예고 + mastery 분포 |
+| `src/main/index.ts` | Electron 부트, 메인/임베드 윈도우, 단축키 fallback chain, INJECT_SCRIPT |
+| `src/main/ipc.ts` | IPC 핸들러, `makeStreamForwarder` (throttle + renderPromise 체인) |
+| `src/main/settings.ts` | `.env` 읽기/쓰기, `MANAGED_KEYS`, secret-skip 로직 |
+| `src/services/leetcode.ts` | LeetCode GraphQL fetch (`questionData`) |
+| `src/services/translator.ts` | Claude translate, streaming 옵션 |
+| `src/services/annotator.ts` | Claude annotate, streaming 옵션 |
+| `src/services/pipeline.ts` | `fetchAndTranslate` + `annotateAndUpload` 오케스트레이션 |
+| `src/services/github.ts` | Octokit git data API, `fileNeedsUpdate`, `verifyConnection` |
+| `src/services/markdown.ts` | marked v12 dynamic import (ESM 우회) |
+| `src/util/language.ts` | `langToExt`, `langToFolder`, `parseProblemInput`, `withRetry` |
+| `src/preload/preload.ts` | contextBridge — IPC 채널 노출만 |
+| `src/renderer/*.{js,html,css}` | UI (vanilla JS) |
 
-### Session 핵심 필드 (페어 모델)
-
-```typescript
-interface Session {
-  sessionUuid?: string         // crypto.randomUUID, 페어 매칭
-  role?: 'host' | 'guest'
-  participants?: string[]      // 호스트 자신 외 N-1명
-  scenarioKeyExpressions?: DialogTurn[]  // {speaker, english, intentKo}
-  mode: 'solo' | 'pair'
-  partnerName?: string         // @deprecated v4 후, 하위호환만
-}
-```
-
-Dexie 마이그레이션 history (v1→v4)는 [src/db/schema.ts](file:///Users/ibm514/Saga-Tales/tale-02-convo-trace-iq/src/db/schema.ts) 참조.
-
----
-
-## 디자인 시스템 v2 (정체성만)
-
-전체 토큰 표는 README + [src/index.css](file:///Users/ibm514/Saga-Tales/tale-02-convo-trace-iq/src/index.css). 변경 금지 핵심:
-
-- **Primary**: vibrant pink (`--color-accent: #ec4899`)
-- **Secondary**: deep teal (`--color-teal: #14787e`)
-- **시그니처**: `✦` sig-star, `rounded-2xl`, `gradient-card`, `lift` hover, `animate-pop-in`, yellow `highlight`
-- **Typography**: Pretendard Variable (body) + Fraunces italic (display)
-- **로고**: convo(teal)·trace(pink)
-
-변경 금기는 STOP 트리거 / 결정 매트릭스 참조.
+전체 트리는 `tree -L 3 src` 또는 직접 ls. 이 표엔 *역할*만, *상세 구현*은 코드.
 
 ---
 
@@ -237,31 +184,20 @@ Dexie 마이그레이션 history (v1→v4)는 [src/db/schema.ts](file:///Users/i
 ### IQ (한동희)
 - 우테코 8기 백엔드, 중앙대 SW
 - INTP, 매일 dogfooder
-- 닉네임 표기: **"아이큐"** (한글, IQ 아님)
-- 커밋 메시지 언어: **한국어** (tale-01의 영어 컨벤션과 다름)
+- 닉네임 표기: **"아이큐"** (한글, 영문 IQ 아님)
+- 커밋 메시지 언어: **한국어**
 - GitHub: [@e9ua1](https://github.com/e9ua1)
 
-### 우테코 영어회화 동아리 'Talking About' v2
-- **주 3회** (월/수/금) 1:00-1:30 (30분)
-- **고정 페어제** (1주일 동안 같은 페어 또는 4인 그룹)
-- 요일별 테마: 월(일상) / 수(상황극) / 금(스피치 + 3-Question Rule)
-- **수요일 4단계** — 본 도구 핵심 fit:
-  1. 표현 연습 (3-4분)
-  2. 상황극 진행 (3-4분)
-  3. 역할 바꿔서 (3-4분)
-  4. 추가 상황 plot twist 후 ②③ 반복 (선택)
-  5. 마무리 — 잘쓴 표현 정리 (5분)
-
-### Saga-Tales venture studio
-- IQ + 보욱 공동 founder
-- 매주 한 tale, vibe-coding 방법론
-- Promotion 기준: **3-of-4** (특정 4 criteria 중 3개 만족)
-- prologue 레포: 모든 tale 진척 hub
+### iq-agent-lab
+- Claude를 활용한 daily workflow tool 모음 (행성 메타포)
+- iq-leetbuddy = 학습 자산화 행성
+- 본 사용자 main use case: 주 5~7 LeetCode 풀이 + 한국어 회고 누적
 
 ### 작업 스타일
 - 깊이 있는 분석 + 명확한 결정 + 트레이드오프 명시
 - 한국어 first
 - "깊게 고민해서" 자주 요청
+- 작은 라운드 묶음 사이클 (큰 PR 안 만듦)
 
 ---
 
@@ -272,56 +208,21 @@ Dexie 마이그레이션 history (v1→v4)는 [src/db/schema.ts](file:///Users/i
 | 결정의 *왜* | **이 파일** (결정 매트릭스) | |
 | 결정의 *언제/누가* | `git log --oneline` | 한국어 커밋 메시지 |
 | 코드 동작 / 정확한 임계값 | 코드 직접 | 이 문서에 hard-code 금지 |
-| 빌드 사이즈 / 의존성 | `npm run build`, `package.json` | 시점 변동 |
-| 사용자/외부용 설명 | README + mermaid 다이어그램 | |
-| 디자인 토큰 전체 표 | README + `src/index.css` | |
+| 사용자/외부용 설명 | README + 설치 가이드 | |
+| 빌드 사이즈 / 의존성 | `package.json` | 시점 변동 |
 
 ---
 
 ## 다음 단계 후보
 
 ### 진행 가능
-- **Dogfooding 사이클** (정기 진행 — 동아리 월/수/금)
-  - 페어 시나리오 길이 적응 검증
-  - QR 동기화 흐름 자연스러움
-  - mastery 업데이트 precision
-- **페어 고정** — 동아리 운영 방식(1주일 같은 페어) 직접 반영
-  - 설정에 "내 페어" 등록 (이름 + 메모)
-  - 시나리오 생성 시 자동 채움
-  - /sessions 페어별 필터
-- **Saga-Tales promotion 검토** — 3-of-4 기준 평가 (보욱과)
+- **번역 결과 캐시** — `userData/cache/translations/{slug}.json`. 같은 titleSlug 재fetch 시 LLM skip
+- **renderer.js → TypeScript** (큰 사이클) — main만 TS, renderer만 JS 비대칭
+- **leetcode.cn 지원** — GRAPHQL_URL을 cn URL이면 cn 엔드포인트로
+- **에러 메시지 한국어화** — Octokit 원본 에러 메시지 wrapping (현재 부분만)
+- **history 카드 클릭 시 cache 사용** — 캐시 hit 시 즉시 step-2 final, streaming skip
 
 보류 / 안 함 결정은 **결정 매트릭스** 참조.
-
----
-
-## Dogfooding 체크포인트
-
-정기 활동 시 확인:
-
-### 시나리오 quality
-- 상황별 분량 적응이 자연스러운가?
-- 쇼핑 짧게 / 깊은 토론 길게 잘 나오는가?
-- Phase 마커(20+ turns)가 흐름과 매칭?
-- 균형 검증 80% threshold가 너무 관대?
-- "Alex" 같은 영어 이름 X / "대학 친구" 일반명사 잘 나오는가?
-
-### 페어 동기화
-- QR 사이즈가 한도 안에 들어오는가? (캡처 많을 때 ~4KB 근처)
-- iOS Safari 카메라 권한 (https 한정)
-- 호스트 중심 4번 스캔 흐름 자연스러운가?
-- sessionUuid 매칭이 다른 회화 QR 막아주는가?
-
-### 회상 폐쇄 루프
-- 두 번째 회화에 첫 회화 phrase가 자연스럽게 녹는가?
-- substring match threshold 적절한가?
-- 1주일 사용 후 mastery 분포(Home 카드)가 의미 있는가?
-- 너무 빠르게 마스터 / 너무 느리게 학습되는가?
-
-### PWA + 백업
-- iOS Safari 3단계 가이드가 명확한가?
-- Android/Desktop "지금 설치" 버튼이 잘 동작하는가?
-- 백업 export → 다른 디바이스 import (Merge / Replace) 정상 동작?
 
 ---
 
@@ -329,32 +230,41 @@ Dexie 마이그레이션 history (v1→v4)는 [src/db/schema.ts](file:///Users/i
 
 | 증상 | 점검 |
 |---|---|
-| `npm install` native binary 에러 | `.npmrc`의 `ignore-scripts=true` 확인 |
-| vite-plugin-pwa SW 캐시 stale | `dist/sw.js` 삭제 + 브라우저 캐시 clear |
-| QR 사이즈 한도 초과 | `MAX_ITEMS` cap / 압축 비율 ([share.ts](file:///Users/ibm514/Saga-Tales/tale-02-convo-trace-iq/src/lib/share.ts)) |
-| IndexedDB schema 불일치 | DevTools Application 탭 → IndexedDB 삭제 후 재진입 |
-| 페어 sessionUuid 매칭 실패 | 호스트 QR 갱신 / 게스트 카메라 권한 / https 확인 |
-| BYOK API 키 인식 X | `localStorage('convo-trace-api-key')` 확인 |
+| 단축키 등록 실패 | macOS Privacy & Security → Input Monitoring 권한. fallback chain 콘솔 `[shortcut]` 로그 |
+| 임베드 LeetCode 로그인 풀림 | userData/cookies 또는 session 데이터 — 보통 한 번 다시 로그인 |
+| streaming 텍스트 안 보임 | marked가 incomplete markdown throw → 다음 flush 재시도. ipc.ts 콘솔 에러 확인 |
+| 코드블록 syntax highlight X | `window.hljs` 로드 확인. `dist/vendor/highlight.min.js` 존재? |
+| 자동 lang 선택 안 됨 | LeetCode UI 변경 fragile. 토스트는 표시되니 수동 변경 |
+| 빌드된 .app 미서명 → 손상 경고 | README "터미널에서 한 번에 설치" 섹션의 `xattr -cr` |
+| 메인 윈도우 안 뜸 | 트레이 아이콘 클릭 또는 단축키 (`Cmd+Option+L` default) |
+| 임베드 URL push 안 됨 | DevTools `console-message` 이벤트 호환성 확인 (Electron 33 시그니처) |
 
 ---
 
-## 완성된 사이클 (요약)
+## 완성된 사이클 요약 (큰 줄기)
 
-상세 진척은 `git log` (한국어 커밋 메시지). 큰 줄기:
-- **Day 1-7**: 기능 완성 — 스키마 → 회화(streaming, CEFR 9단계) → 캡처(ko→en, lookup) → 자동 추출 + 디자인 v2 → 회상 폐쇄 루프 → 페어 N명·QR → PWA·백업
-- **마이크로 #1**: 페어 라벨 + 시나리오 quality + 4단계 가이드
-- **마이크로 #2**: PWA 설치 UX (`beforeinstallprompt` + 플랫폼 분기)
-- **마이크로 #3**: 페어 시나리오 자율성 (강제 cap → LLM 자율)
+상세 진척은 `git log` (한국어 커밋 메시지):
+- **v0.1~0.3**: 기본 파이프라인 — LeetCode fetch → translate → annotate → GitHub commit → .app 패키징 + Actions 자동 release
+- **임베드 LeetCode**: persist session + 양방향 URL 전달 (push: chip/메뉴/단축키 + pull: input 보조 버튼)
+- **원문 lang 자동 안내**: hash 전달 + 토스트 + best-effort DOM 조작
+- **Input UX**: hint 카드 그리드 + paste 정규화 미리보기 + clear 버튼 + 에러 shake
+- **시작 언어 기억**: localStorage, 마지막 선택 유지
+- **다음 문제 버튼**: upload 성공 후 reset 발견성↑
+- **Streaming**: spinner-only → 즉시 점진 표시 (translate + annotate)
+- **최근 풀이 chips**: localStorage 5개 LRU + dedup
+- **README 중복 commit skip**: `fileNeedsUpdate` sha 비교
+- **첫 실행 자동 prompt + credential 에러 모달**: onboarding 마찰 제거
+- **코드블록 hljs**: 번역/회고 영역에도 syntax highlight
 
 ---
 
 ## 이 문서 유지 원칙
 
-v1에서 확인된 안티패턴 (재발 방지):
+다른 tale-02 작업 컨텍스트 문서에서 도출된 안티패턴 (재발 방지):
 
-- ❌ **코드와 sync 강제되는 spec hard-code** — 빌드 사이즈, 정확한 임계값, 전체 디렉토리 트리, 디자인 토큰 표는 drift 시한폭탄. 이 문서엔 *원리*만, *값*은 코드/README에서 읽을 것
-- ❌ **같은 결정 다중 진술** — v1엔 "누적 리뷰 안 만듦"이 4곳에 반복됐었음. **한 결정은 결정 매트릭스 한 곳**
-- ❌ **상대 일자** ("현재 진행 중", "다음 동아리") — 절대 일자 또는 evergreen 표현
+- ❌ **코드와 sync 강제되는 spec hard-code** — throttle 정확한 ms, 캐시 만료 시간, 전체 디렉토리 트리는 drift 시한폭탄. 이 문서엔 *원리*만, *값*은 코드/README에서 읽을 것
+- ❌ **같은 결정 다중 진술** — **한 결정은 결정 매트릭스 한 곳**
+- ❌ **상대 일자** ("현재 진행 중", "최근 변경") — 절대 일자 또는 evergreen 표현
 - ✓ 결정의 *왜* 만 담기. *언제/누가* 는 git log
-- ✓ 사용자 quote anchor 보존 — "누적 리뷰는 알아서 하는 게 낫지 않나?" 같은 원본 문장이 변경 금기 신뢰도의 핵심
+- ✓ 사용자 명시 결정 anchor 보존
 - ✓ 새 결정 추가 시 결정 매트릭스 + 필요하면 STOP 트리거 두 곳만 update
