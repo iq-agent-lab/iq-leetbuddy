@@ -379,10 +379,10 @@ iq-leetbuddy/
 - [x] README 중복 commit skip + 번역 결과 캐시
 - [x] 첫 실행 자동 settings prompt + credential 에러 자동 모달
 - [x] Renderer TypeScript 마이그레이션 (main↔renderer 비대칭 해소)
+- [x] **OS keychain 통합** — Electron `safeStorage`로 시크릿 암호화 (macOS Keychain / Windows DPAPI / Linux libsecret) + 첫 부팅 시 평문 .env 자동 마이그레이션
 
 ### v0.4 (다음)
 
-- [ ] **OS keychain 통합** — `.env` 평문 대신 macOS Keychain
 - [ ] **앱 자동 업데이트** — electron-updater로 새 버전 알림
 - [ ] **CodeMirror 6 에디터** — textarea overlay → 진짜 코드 에디터
 - [ ] **LeetCode 세션 활용** — `submissionList` GraphQL → 최근 Accepted 자동 fetch
@@ -437,6 +437,16 @@ rm -rf "~/Library/Application Support/iq-leetbuddy/cache/translations/"
 ```bash
 rm "~/Library/Application Support/iq-leetbuddy/cache/translations/{slug}.json"
 ```
+
+### 다른 컴퓨터 / 계정으로 .env를 옮겼더니 키가 안 먹음
+
+OS keychain encrypted 시크릿은 **그 머신/계정에서만 복호화 가능**. 다른 머신으로 `.env`를 그대로 옮기면 `ENC:` prefix 시크릿이 복호화 실패 → 빈 값으로 처리됨 → ⚙️ 설정 모달이 자동으로 뜸. 새 머신에서 키를 다시 입력하면 그 머신의 keychain으로 새로 암호화됨.
+
+일반 설정(`ANTHROPIC_MODEL`, `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_BRANCH`, `GITHUB_AUTO_CREATE_REPO`)은 평문이므로 그대로 옮겨감.
+
+### Linux에서 keychain 없을 때
+
+`safeStorage.isEncryptionAvailable()`이 `false`면 (libsecret/kwallet 없는 minimal 환경) **평문으로 저장 fallback** + 콘솔 경고 없음. 이 경우 `.env` 권한을 `chmod 600`으로 제한 권장.
 
 ### 임베드 → 메인 URL 전달이 안 됨
 

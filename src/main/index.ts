@@ -21,6 +21,7 @@ import {
   setPullCurrentLeetCodeUrl,
   setShortcutGetter,
 } from './ipc';
+import { decryptProcessEnvSecrets, migrateSecretsIfNeeded } from './settings';
 
 // .env 로드 — 패키지 모드는 userData, dev 모드는 프로젝트 루트
 function loadEnv() {
@@ -532,8 +533,15 @@ function createAppMenu() {
 }
 
 // ─── 부트스트랩 ──────────────────────────────
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   loadEnv(); // app.isPackaged + app.getPath('userData') 사용 가능 시점
+
+  // 시크릿(API_KEY/TOKEN)이 OS keychain encrypted면 process.env에 평문으로 복호화
+  // legacy .env의 평문 시크릿은 그대로 두고, 다음 줄의 migration이 자동으로 암호화
+  decryptProcessEnvSecrets();
+
+  // 평문 시크릿 있으면 OS keychain encrypted로 자동 마이그레이션 (best-effort)
+  await migrateSecretsIfNeeded();
 
   // macOS Dock 아이콘 명시 (개발 모드에서도 코랄 행성 보이게)
   // 패키징된 앱은 .icns가 자동 사용됨

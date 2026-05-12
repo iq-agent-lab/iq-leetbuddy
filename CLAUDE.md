@@ -83,6 +83,7 @@ npm run release            # version patch + push + GitHub Actions
 | 자동 레포 생성 + 1회 재시도 | 유지 | 404 시 `createRepoIfMissing` + 1.5s propagation wait + retry. annotated 결과 재사용으로 AI 비용 추가 X |
 | 시크릿 UI 노출 X | 유지 | `hasAnthropicKey`/`hasGithubToken` flag만. `.env` 같은 구현 단어 사용자에게 노출 안 함 |
 | .env 저장 위치 분리 | 유지 | dev: 프로젝트 루트, packaged: `userData/.env` (asar read-only 회피) |
+| 시크릿 OS keychain 암호화 | 유지 | Electron `safeStorage`로 macOS Keychain/Windows DPAPI/Linux libsecret. `.env`엔 `ENC:base64` prefix로 저장, `process.env`엔 복호화된 평문. 첫 부팅 시 평문 자동 마이그레이션. canEncrypt() 실패 시 평문 fallback |
 | 영속 LeetCode 세션 | 유지 | `session.fromPartition('persist:leetcode')` — 한 번 로그인하면 다음 실행까지 유지 |
 | 임베드 push: console-message sentinel | 유지 | preload 추가 없이 LeetCode 페이지 JS와 격리. `console.log(SENTINEL + url)` → main의 `console-message`로 캡처 |
 | 원문 클릭 시 lang은 URL hash | 유지 | `#leetbuddy-lang=java`로 전달. INJECT_SCRIPT가 hash 읽어 토스트(확정) + DOM 조작(best-effort) |
