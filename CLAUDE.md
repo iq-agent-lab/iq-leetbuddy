@@ -87,6 +87,8 @@ npm run release            # version patch + push + GitHub Actions
 | 숫자 입력 = frontendId 해결 | 유지 | `parseProblemInput`이 ParsedInput 객체 반환 (`isNumericId` flag). main에서 `resolveTitleSlugByFrontendId` 호출 (searchKeywords + 정확 매칭). renderer paste preview는 미리 "문제 #N 으로 검색" 표시 |
 | leetcode.cn URL 인식 (com fallback) | 유지 | cn은 Cloudflare bot protection으로 직접 GraphQL 접근 시 HTTP 403. cn URL 받아도 com endpoint로 fetch (같은 slug 공유). cn-only 문제만 404로 fail. parseProblemInput에서 isCN flag 제거 — 모든 URL이 동일 처리 |
 | 풀이 레포 root README 자동 인덱스 | 유지 | uploadSolution이 매 풀이마다 root README marker 영역만 update. `<!-- iq-leetbuddy:problems:start/end -->` 사이만 touch — 사용자 자유 텍스트(위/아래) 보존. 같은 slug는 languages 합치고 savedAt 갱신. 실패 silent (풀이 commit 우선) |
+| 풀이 통계 localStorage (not SQLite) | 유지 | `better-sqlite3` native module은 electron rebuild 필요 + 플랫폼별 까다로움. localStorage JSON 배열로 단순화 — 오프라인 안전, 디바이스 sync 안 됨. 가치 90% 보존. 📊 모달에서 요약/난이도/언어/월별/최근 표시 |
+| 자동 업데이트 = polling (not electron-updater) | 유지 | electron-updater는 macOS unsigned 앱에서 squirrel.mac cert 요구로 fail. cert 비용 + 복잡도 큼. 대신 GitHub Releases API polling + footer pill로 알림만 — 다운로드는 기존 zip 흐름. dev 모드는 `app.isPackaged`로 skip |
 | 영속 LeetCode 세션 | 유지 | `session.fromPartition('persist:leetcode')` — 한 번 로그인하면 다음 실행까지 유지 |
 | 임베드 push: console-message sentinel | 유지 | preload 추가 없이 LeetCode 페이지 JS와 격리. `console.log(SENTINEL + url)` → main의 `console-message`로 캡처 |
 | 원문 클릭 시 lang은 URL hash | 유지 | `#leetbuddy-lang=java`로 전달. INJECT_SCRIPT가 hash 읽어 토스트(확정) + DOM 조작(best-effort) |

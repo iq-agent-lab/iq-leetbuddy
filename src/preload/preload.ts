@@ -45,4 +45,9 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('annotate-stream', handler);
     return () => ipcRenderer.removeListener('annotate-stream', handler);
   },
+  onUpdateAvailable: (cb: (info: { tag: string; url: string }) => void) => {
+    const handler = (_e: unknown, info: { tag: string; url: string }) => cb(info);
+    ipcRenderer.on('update-available', handler);
+    return () => ipcRenderer.removeListener('update-available', handler);
+  },
 });

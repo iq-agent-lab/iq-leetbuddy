@@ -118,6 +118,7 @@ export interface IqApi {
   onPullProblem: (cb: (url: string) => void) => () => void;
   onTranslateStream: (cb: (html: string) => void) => () => void;
   onAnnotateStream: (cb: (html: string) => void) => () => void;
+  onUpdateAvailable: (cb: (info: { tag: string; url: string }) => void) => () => void;
 }
 
 declare global {

@@ -188,6 +188,175 @@ function renderRecent(): void {
   wrap.classList.remove('hidden');
 }
 
+// ─── 풀이 통계 (localStorage) ────────────────────────────────
+const SOLUTIONS_KEY = 'iq-leetbuddy:solutions';
+
+interface SolutionRecord {
+  frontendId: number;
+  title: string;
+  titleSlug: string;
+  language: string;
+  difficulty: string;
+  savedAt: number; // unix ms
+}
+
+function readSolutions(): SolutionRecord[] {
+  try {
+    const raw = localStorage.getItem(SOLUTIONS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? (arr as SolutionRecord[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function recordSolution(rec: SolutionRecord): void {
+  try {
+    const all = readSolutions();
+    // 같은 slug+language면 update (재upload 케이스) — 최신으로 갱신
+    const filtered = all.filter((s) => !(s.titleSlug === rec.titleSlug && s.language === rec.language));
+    filtered.unshift(rec);
+    localStorage.setItem(SOLUTIONS_KEY, JSON.stringify(filtered));
+  } catch {
+    // localStorage 사용 불가 환경 무시
+  }
+}
+
+// ─── 통계 dashboard 렌더링 ───────────────────────────────────
+function ymKey(ts: number): string {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function ymdKey(ts: number): string {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// 연속 풀이 일수 (오늘 또는 어제부터 거꾸로 카운트)
+function computeStreak(solutions: SolutionRecord[]): number {
+  if (solutions.length === 0) return 0;
+  const days = new Set(solutions.map((s) => ymdKey(s.savedAt)));
+  let streak = 0;
+  const now = new Date();
+  // 오늘부터 시작 — 오늘이 없으면 어제부터 (시간대 보정 없이 단순)
+  const start = days.has(ymdKey(now.getTime())) ? now : new Date(now.getTime() - 86400000);
+  for (let i = 0; ; i++) {
+    const d = new Date(start.getTime() - i * 86400000);
+    if (days.has(ymdKey(d.getTime()))) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+function renderBarRow(label: string, count: number, max: number, extraClass = ''): string {
+  const pct = max > 0 ? Math.round((count / max) * 100) : 0;
+  return `<div class="stats-bar-row">
+    <span class="stats-bar-label">${escapeHtml(label)}</span>
+    <div class="stats-bar-track"><div class="stats-bar-fill ${extraClass}" style="width: ${pct}%"></div></div>
+    <span class="stats-bar-count">${count}</span>
+  </div>`;
+}
+
+function renderStatsDashboard(): void {
+  const solutions = readSolutions();
+  const empty = $('stats-empty');
+  const content = $('stats-content');
+
+  if (solutions.length === 0) {
+    empty.classList.remove('hidden');
+    content.classList.add('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  content.classList.remove('hidden');
+
+  // 요약
+  $('stats-total').textContent = String(solutions.length);
+
+  const now = new Date();
+  const thisYM = ymKey(now.getTime());
+  const sevenDaysAgo = now.getTime() - 7 * 86400000;
+  $('stats-this-month').textContent = String(solutions.filter((s) => ymKey(s.savedAt) === thisYM).length);
+  $('stats-week').textContent = String(solutions.filter((s) => s.savedAt >= sevenDaysAgo).length);
+  const streakValueEl = $('stats-streak');
+  // streak는 숫자 + "일" suffix — innerHTML로 unit span 유지
+  streakValueEl.innerHTML = `${computeStreak(solutions)}<span class="stats-value-unit">일</span>`;
+
+  // 난이도 분포
+  const diffOrder = ['Easy', 'Medium', 'Hard'];
+  const diffClass: Record<string, string> = { Easy: 'easy', Medium: 'medium', Hard: 'hard' };
+  const diffCounts: Record<string, number> = { Easy: 0, Medium: 0, Hard: 0 };
+  for (const s of solutions) {
+    if (diffCounts[s.difficulty] !== undefined) diffCounts[s.difficulty]++;
+  }
+  const maxDiff = Math.max(...Object.values(diffCounts), 1);
+  $('stats-difficulty').innerHTML = diffOrder
+    .map((d) => renderBarRow(d, diffCounts[d], maxDiff, diffClass[d]))
+    .join('');
+
+  // 언어 분포 (사용 언어만, 카운트 내림차순)
+  const langCounts: Record<string, number> = {};
+  for (const s of solutions) {
+    langCounts[s.language] = (langCounts[s.language] || 0) + 1;
+  }
+  const sortedLangs = Object.entries(langCounts).sort((a, b) => b[1] - a[1]);
+  const maxLang = sortedLangs.length > 0 ? sortedLangs[0][1] : 1;
+  $('stats-language').innerHTML = sortedLangs.map(([l, c]) => renderBarRow(l, c, maxLang)).join('');
+
+  // 월별 (최근 6개월)
+  const months: { ym: string; label: string }[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const label = `${d.getMonth() + 1}월`;
+    months.push({ ym, label });
+  }
+  const monthCounts: Record<string, number> = {};
+  for (const s of solutions) {
+    monthCounts[ymKey(s.savedAt)] = (monthCounts[ymKey(s.savedAt)] || 0) + 1;
+  }
+  const maxMonth = Math.max(...months.map((m) => monthCounts[m.ym] || 0), 1);
+  $('stats-monthly').innerHTML = months
+    .map((m) => {
+      const c = monthCounts[m.ym] || 0;
+      const pct = (c / maxMonth) * 100;
+      return `<div class="stats-month-col">
+        <span class="stats-month-count">${c > 0 ? c : ''}</span>
+        <div class="stats-month-bar-wrap"><div class="stats-month-bar" style="height: ${pct}%"></div></div>
+        <span class="stats-month-label">${m.label}</span>
+      </div>`;
+    })
+    .join('');
+
+  // 최근 풀이 10개 (이미 unshift로 최신 우선)
+  const recent = solutions.slice(0, 10);
+  $('stats-recent').innerHTML = recent
+    .map((s) => {
+      const date = ymdKey(s.savedAt);
+      return `<div class="stats-recent-row">
+        <span class="stats-recent-id">#${s.frontendId}</span>
+        <span class="stats-recent-title" title="${escapeHtml(s.title)}">${escapeHtml(s.title)}</span>
+        <span class="stats-recent-lang">${escapeHtml(s.language)}</span>
+        <span class="stats-recent-date">${date}</span>
+      </div>`;
+    })
+    .join('');
+}
+
+function openStats(): void {
+  renderStatsDashboard();
+  $('stats-modal').classList.remove('hidden');
+}
+
+function closeStats(): void {
+  $('stats-modal').classList.add('hidden');
+}
+
 // ─── 마지막 선택 언어 기억 ───────────────────────────────────
 const PREFERRED_LANG_KEY = 'iq-leetbuddy:preferred-lang';
 
@@ -484,6 +653,19 @@ function showUploadSuccess(result: UploadResultShape): void {
     </div>
   `;
   $btn('next-problem-btn').addEventListener('click', reset);
+
+  // 풀이 통계에 기록 — state에 problem/language 보존되어 있음
+  if (state.problem && state.selectedLang) {
+    recordSolution({
+      frontendId: parseInt(state.problem.questionFrontendId, 10),
+      title: state.problem.title,
+      titleSlug: state.problem.titleSlug,
+      language: state.selectedLang,
+      difficulty: state.problem.difficulty,
+      savedAt: Date.now(),
+    });
+  }
+
   setStatus('완료 · 다음 문제 가져오기 가능', 'ok');
 }
 
@@ -918,6 +1100,16 @@ $('translation-output').addEventListener('click', (e: Event) => {
 });
 
 $btn('pull-embed-btn').addEventListener('click', handlePullFromEmbed);
+$btn('open-stats-btn').addEventListener('click', openStats);
+$btn('close-stats').addEventListener('click', (e: Event) => {
+  e.stopPropagation();
+  closeStats();
+});
+$('stats-modal').addEventListener('click', (e: Event) => {
+  const target = e.target as HTMLElement | null;
+  if (target?.id === 'stats-modal') closeStats();
+});
+
 $btn('open-settings-btn').addEventListener('click', openSettings);
 // X 버튼: bubbling으로 인한 settings-modal backdrop click handler와 충돌 차단
 $btn('close-settings').addEventListener('click', (e: Event) => {
@@ -952,6 +1144,9 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
   }
   if (e.key === 'Escape' && !$('settings-modal').classList.contains('hidden')) {
     closeSettings();
+  }
+  if (e.key === 'Escape' && !$('stats-modal').classList.contains('hidden')) {
+    closeStats();
   }
 });
 
@@ -993,5 +1188,15 @@ window.addEventListener('DOMContentLoaded', () => {
   window.api.onAnnotateStream((html: string) => {
     const el = $('annotation-stream') as HTMLElement | null;
     if (el) el.innerHTML = html;
+  });
+
+  // 새 버전 release되면 footer에 pill 표시 — main의 checkForUpdates에서 push
+  // 클릭 시 GitHub Releases 페이지 열림 (target="_blank"라 main 윈도우 navigate 가로채기 X)
+  window.api.onUpdateAvailable((info: { tag: string; url: string }) => {
+    const el = $('update-available') as HTMLAnchorElement;
+    el.textContent = `↗ ${info.tag} 사용 가능`;
+    el.href = info.url;
+    el.title = `새 버전 ${info.tag} 다운로드`;
+    el.classList.remove('hidden');
   });
 });

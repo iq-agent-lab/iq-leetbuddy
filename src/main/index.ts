@@ -22,6 +22,7 @@ import {
   setShortcutGetter,
 } from './ipc';
 import { decryptProcessEnvSecrets, migrateSecretsIfNeeded } from './settings';
+import { checkForUpdates } from './update';
 
 // .env 로드 — 패키지 모드는 userData, dev 모드는 프로젝트 루트
 function loadEnv() {
@@ -572,6 +573,8 @@ app.whenReady().then(async () => {
 
   mainWindow?.once('ready-to-show', () => {
     mainWindow?.show();
+    // 부팅 후 비동기 update 체크 (dev에선 skip됨)
+    checkForUpdates(mainWindow);
   });
 
   app.on('activate', () => {
