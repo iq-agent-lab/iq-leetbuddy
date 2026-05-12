@@ -45,44 +45,50 @@
       <div class="step-body">
         <h2 class="step-title">문제 가져오기</h2>
         <p class="step-hint step-hint-lead">
-          어떤 형식이든 OK — 대소문자, 공백, <code>-</code>, <code>_</code> 모두 자동 정규화
+          URL · slug · 문제 이름 · 또는 임베드에서 — 어떤 형식이든 OK
         </p>
         <div class="recent-row hidden" id="recent-row"></div>
-        <div class="hint-grid">
-          <div class="hint-card">
-            <span class="hint-card-label">slug 그대로</span>
-            <div class="hint-card-examples">
-              <code>two-sum</code>
-              <code>symmetric-tree</code>
+        <details class="hint-details">
+          <summary class="hint-summary">
+            <span class="hint-summary-toggle">펼쳐보기</span>
+            <span class="hint-summary-text">대소문자/공백/<code>-</code>/<code>_</code> 모두 자동 정규화 — 자세한 예시</span>
+          </summary>
+          <div class="hint-grid">
+            <div class="hint-card">
+              <span class="hint-card-label">slug 그대로</span>
+              <div class="hint-card-examples">
+                <code>two-sum</code>
+                <code>symmetric-tree</code>
+              </div>
+            </div>
+            <div class="hint-card">
+              <span class="hint-card-label">문제 이름 (자유 형식)</span>
+              <div class="hint-card-examples">
+                <code>Two Sum</code>
+                <code>symmetric tree</code>
+                <code>TWO SUM</code>
+                <code>symmetric_tree</code>
+              </div>
+              <span class="hint-card-note">대소문자/공백/언더스코어 무관</span>
+            </div>
+            <div class="hint-card hint-card-wide">
+              <span class="hint-card-label">전체 URL (어떤 페이지든)</span>
+              <div class="hint-card-examples hint-card-examples-stacked">
+                <code>https://leetcode.com/problems/two-sum/</code>
+                <code>https://leetcode.com/problems/.../description/?envType=...&envId=...</code>
+              </div>
+              <span class="hint-card-note">envType, envId 등 쿼리 자동 무시 — 주소창 그대로 붙여넣어도 됨</span>
+            </div>
+            <div class="hint-card hint-card-accent">
+              <span class="hint-card-label">임베드 LeetCode에서 가져오기</span>
+              <ul class="hint-card-list">
+                <li>임베드 윈도우 우하단 <strong>"→ leetbuddy로 가져오기"</strong> chip</li>
+                <li>메뉴바 <kbd>⌘⇧↩</kbd></li>
+                <li>아래 <strong>"↩ 임베드에서"</strong> 버튼</li>
+              </ul>
             </div>
           </div>
-          <div class="hint-card">
-            <span class="hint-card-label">문제 이름 (자유 형식)</span>
-            <div class="hint-card-examples">
-              <code>Two Sum</code>
-              <code>symmetric tree</code>
-              <code>TWO SUM</code>
-              <code>symmetric_tree</code>
-            </div>
-            <span class="hint-card-note">대소문자/공백/언더스코어 무관</span>
-          </div>
-          <div class="hint-card hint-card-wide">
-            <span class="hint-card-label">전체 URL (어떤 페이지든)</span>
-            <div class="hint-card-examples hint-card-examples-stacked">
-              <code>https://leetcode.com/problems/two-sum/</code>
-              <code>https://leetcode.com/problems/.../description/?envType=...&envId=...</code>
-            </div>
-            <span class="hint-card-note">envType, envId 등 쿼리 자동 무시 — 주소창 그대로 붙여넣어도 됨</span>
-          </div>
-          <div class="hint-card hint-card-accent">
-            <span class="hint-card-label">임베드 LeetCode에서 가져오기</span>
-            <ul class="hint-card-list">
-              <li>임베드 윈도우 우하단 <strong>"→ leetbuddy로 가져오기"</strong> chip</li>
-              <li>메뉴바 <kbd>⌘⇧↩</kbd></li>
-              <li>아래 <strong>"↩ 임베드에서"</strong> 버튼</li>
-            </ul>
-          </div>
-        </div>
+        </details>
         <div class="input-row">
           <div class="input-with-clear">
             <input id="problem-input" type="text" placeholder="LeetCode 문제 URL 또는 slug를 입력해주세요" autocomplete="off" spellcheck="false">
@@ -148,7 +154,7 @@
   </main>
 
   <footer class="app-footer">
-    <span>iq-agent-lab · v0.4.0</span>
+    <span>iq-agent-lab · v0.4.2</span>
     <span class="footer-divider">·</span>
     <span id="config-status">설정 확인 중...</span>
     <span class="footer-divider">·</span>
@@ -160,7 +166,7 @@
     <div class="modal">
       <header class="modal-header">
         <h2>설정</h2>
-        <button class="modal-close" id="close-settings" aria-label="닫기">×</button>
+        <button type="button" class="modal-close" id="close-settings" aria-label="닫기">×</button>
       </header>
       <div class="modal-body">
         <ul class="modal-hint">

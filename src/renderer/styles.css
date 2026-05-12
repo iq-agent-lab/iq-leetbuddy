@@ -1037,11 +1037,105 @@ textarea::-webkit-scrollbar-track {
   margin-bottom: 10px;
 }
 
+/* collapsible 토글 — 처음엔 닫혀있고 펼치면 카드 그리드 표시 */
+.hint-details {
+  margin-bottom: 14px;
+}
+
+.hint-summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px 6px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 99px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  background: var(--bg-soft);
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.hint-summary::-webkit-details-marker {
+  display: none;
+}
+
+.hint-summary:hover {
+  border-color: var(--accent);
+  color: var(--accent-soft);
+  background: rgba(204, 120, 92, 0.05);
+}
+
+.hint-summary-toggle {
+  position: relative;
+  padding-left: 14px;
+  font-weight: 500;
+  color: var(--accent-soft);
+  letter-spacing: -0.01em;
+}
+
+.hint-summary-toggle::before {
+  content: '▸';
+  position: absolute;
+  left: 0;
+  transition: transform 0.15s ease;
+  font-size: 9px;
+  top: 3px;
+}
+
+.hint-details[open] .hint-summary-toggle::before {
+  transform: rotate(90deg);
+}
+
+.hint-details[open] .hint-summary-toggle::after {
+  content: '접기';
+}
+
+.hint-details[open] .hint-summary-toggle {
+  font-size: 0; /* "펼쳐보기" 텍스트 숨김 */
+}
+
+.hint-details[open] .hint-summary-toggle::after {
+  font-size: 11.5px;
+}
+
+.hint-details[open] .hint-summary-toggle::before {
+  font-size: 9px;
+}
+
+.hint-summary-text {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.hint-summary-text code {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: 0 4px;
+  border-radius: 3px;
+  color: var(--accent-soft);
+  margin: 0 1px;
+}
+
+.hint-details[open] .hint-grid {
+  animation: hint-fade-in 0.2s ease-out;
+}
+
+@keyframes hint-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .hint-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-top: 10px;
+  margin-bottom: 4px;
 }
 
 .hint-card {
@@ -1407,15 +1501,28 @@ pre code.hljs {
   border: none;
   font-size: 24px;
   color: var(--text-dim);
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   cursor: pointer;
   line-height: 1;
+  border-radius: 6px;
+  /* hit area 확보 + 다른 element 위로 (혹시 모를 stacking 충돌 회피) */
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s ease, color 0.12s ease;
 }
 
 .modal-close:hover {
   color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.modal-close:active {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .modal-body {

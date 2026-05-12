@@ -43,7 +43,8 @@ iq-agent-lab 행성 중 하나. 매일 문제 풀이를 *기록 가능한 학습
 cd /tmp && \
 unzip -o ~/Downloads/iq-leetbuddy-*-mac.zip && \
 xattr -cr iq-leetbuddy.app && \
-mv -f iq-leetbuddy.app /Applications/ && \
+rm -rf /Applications/iq-leetbuddy.app && \
+mv iq-leetbuddy.app /Applications/ && \
 open /Applications/iq-leetbuddy.app
 ```
 
@@ -54,7 +55,8 @@ open /Applications/iq-leetbuddy.app
 | `cd /tmp` | 작업 디렉토리로 이동 |
 | `unzip -o ~/Downloads/...` | Downloads의 zip 풀기 (Apple Silicon/Intel 자동 매칭) |
 | `xattr -cr iq-leetbuddy.app` | quarantine 꼬리표 제거 (이게 핵심) |
-| `mv -f ... /Applications/` | Applications 폴더로 옮기기 (기존 버전 덮어쓰기) |
+| `rm -rf /Applications/iq-leetbuddy.app` | 기존 버전 제거 (.app은 디렉토리라 `mv -f`로 덮어쓰기 안 됨 — `Directory not empty` 에러 회피) |
+| `mv ... /Applications/` | Applications 폴더로 옮기기 |
 | `open ...` | 실행 |
 
 성공하면:

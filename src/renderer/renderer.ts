@@ -870,8 +870,15 @@ $('translation-output').addEventListener('click', (e: Event) => {
 
 $btn('pull-embed-btn').addEventListener('click', handlePullFromEmbed);
 $btn('open-settings-btn').addEventListener('click', openSettings);
-$btn('close-settings').addEventListener('click', closeSettings);
-$btn('cancel-settings').addEventListener('click', closeSettings);
+// X 버튼: bubbling으로 인한 settings-modal backdrop click handler와 충돌 차단
+$btn('close-settings').addEventListener('click', (e: Event) => {
+  e.stopPropagation();
+  closeSettings();
+});
+$btn('cancel-settings').addEventListener('click', (e: Event) => {
+  e.stopPropagation();
+  closeSettings();
+});
 $btn('save-settings').addEventListener('click', saveSettings);
 
 $btn('pat-help-btn').addEventListener('click', () => {
