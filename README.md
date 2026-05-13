@@ -49,7 +49,8 @@ unzip -o ~/Downloads/iq-leetbuddy-*-mac.zip && \
 xattr -cr iq-leetbuddy.app && \
 rm -rf /Applications/iq-leetbuddy.app && \
 mv iq-leetbuddy.app /Applications/ && \
-open /Applications/iq-leetbuddy.app
+open /Applications/iq-leetbuddy.app && \
+rm -f ~/Downloads/iq-leetbuddy-*-mac.zip
 ```
 
 각 줄이 하는 일:
@@ -62,6 +63,7 @@ open /Applications/iq-leetbuddy.app
 | `rm -rf /Applications/iq-leetbuddy.app` | 기존 버전 제거 (.app은 디렉토리라 `mv -f`로 덮어쓰기 안 됨 — `Directory not empty` 에러 회피) |
 | `mv ... /Applications/` | Applications 폴더로 옮기기 |
 | `open ...` | 실행 |
+| `rm -f ~/Downloads/...zip` | 다운로드 폴더의 zip 정리 — 다음 업데이트 시 여러 버전 zip이 섞여 glob이 헷갈리는 문제 회피 |
 
 성공하면:
 - Dock에 코랄 행성 아이콘이 떠오르고
