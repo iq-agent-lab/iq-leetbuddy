@@ -467,6 +467,35 @@ export async function createRepoIfMissing(): Promise<{
   }
 }
 
+// ─── 풀이 통계 backfill — root README 인덱스에서 풀이 entry 추출 ─
+// 사용자가 다른 디바이스에서 풀이했거나 v0.5 이전 풀이 (localStorage stats가
+// 없던 시점)도 통계에 포함하기 위함. UI의 stats 모달 "GitHub에서 동기화"
+// 버튼 → 이 함수 호출 → 결과를 localStorage solutions에 merge.
+export async function fetchIndexFromGithub(): Promise<{
+  entries: Array<{
+    frontendId: number;
+    title: string;
+    titleSlug: string;
+    difficulty: string;
+    languages: string[];
+    savedAt: string;
+  }>;
+}> {
+  const owner = process.env.GITHUB_OWNER;
+  const repo = process.env.GITHUB_REPO;
+  const branch = process.env.GITHUB_BRANCH || 'main';
+  if (!owner || !repo) {
+    throw new Error('GITHUB_OWNER 또는 GITHUB_REPO가 설정되지 않았습니다 — ⚙️ 설정에서 입력해주세요');
+  }
+
+  const readme = await fetchFileContent(owner, repo, 'README.md', branch);
+  if (!readme) return { entries: [] };
+
+  // parseExistingIndex는 이미 있음 (v0.5 root README 인덱스 update용)
+  const entries = parseExistingIndex(readme);
+  return { entries };
+}
+
 // 연결 진단: 토큰 유효성 + 레포 존재 확인 + 브랜치 일치 여부
 export async function verifyConnection(): Promise<{
   authedAs: string;

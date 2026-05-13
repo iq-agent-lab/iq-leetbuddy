@@ -75,6 +75,8 @@ export interface CheckConfigResult {
   owner: string;
   repo: string;
   shortcut: string | null;
+  /** OS keychain (safeStorage) 사용 가능 여부 — false면 시크릿이 평문 fallback. settings 모달에 경고. */
+  keychain: boolean;
 }
 
 export interface VerifyResult {
@@ -114,6 +116,18 @@ export interface IqApi {
   fetchSubmission: (
     titleSlug: string
   ) => Promise<IpcResult<{ code: string; langSlug: string; langName: string }>>;
+  backfillFromGithub: () => Promise<
+    IpcResult<{
+      entries: Array<{
+        frontendId: number;
+        title: string;
+        titleSlug: string;
+        difficulty: string;
+        languages: string[];
+        savedAt: string;
+      }>;
+    }>
+  >;
   createRepo: () => Promise<IpcResult<CreateRepoResult>>;
   verifyGithub: () => Promise<IpcResult<VerifyResult>>;
   onFetchProgress: (cb: (stage: string) => void) => () => void;

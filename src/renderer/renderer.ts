@@ -40,6 +40,57 @@ const CM5_MODE: Record<string, string> = {
 
 let cmEditor: any = null;
 
+// ─── draft 자동 저장 (CodeMirror change → debounced localStorage) ────
+// 사용자가 step-3에서 코드 작성 중 앱 종료 시 데이터 손실 방지.
+// key 형식: 'iq-leetbuddy:draft:{slug}:{lang}'
+// upload 성공 시 해당 draft 자동 삭제.
+const DRAFT_KEY_PREFIX = 'iq-leetbuddy:draft:';
+
+function currentDraftKey(): string | null {
+  if (!state.problem || !state.selectedLang) return null;
+  return `${DRAFT_KEY_PREFIX}${state.problem.titleSlug}:${state.selectedLang}`;
+}
+
+let draftSaveTimer: number | null = null;
+function scheduleDraftSave(): void {
+  if (draftSaveTimer !== null) clearTimeout(draftSaveTimer);
+  draftSaveTimer = window.setTimeout(() => {
+    draftSaveTimer = null;
+    const key = currentDraftKey();
+    if (!key) return;
+    try {
+      const code = getEditorCode();
+      if (code.trim()) {
+        localStorage.setItem(key, code);
+      } else {
+        localStorage.removeItem(key);
+      }
+    } catch {
+      // localStorage quota / private mode 등 — silent
+    }
+  }, 800);
+}
+
+function maybeRestoreDraft(): void {
+  const key = currentDraftKey();
+  if (!key) return;
+  try {
+    const draft = localStorage.getItem(key);
+    if (draft && !getEditorCode().trim()) {
+      setEditorCode(draft);
+      setStatus('이전 작성 중이던 코드 복원됨 — 그대로 진행하거나 새로 작성', 'busy');
+    }
+  } catch {}
+}
+
+function clearCurrentDraft(): void {
+  const key = currentDraftKey();
+  if (!key) return;
+  try {
+    localStorage.removeItem(key);
+  } catch {}
+}
+
 function initCodeEditor(): void {
   const container = $('code-editor');
   if (typeof CodeMirror === 'undefined') {
@@ -60,6 +111,7 @@ function initCodeEditor(): void {
     lineWrapping: false,
     placeholder: '// 여기에 통과한 코드를 붙여넣어주세요 (또는 위 버튼으로 자동 가져오기)',
   });
+  cmEditor.on('change', scheduleDraftSave);
 }
 
 function setEditorLang(slug: string | null): void {
@@ -130,7 +182,18 @@ function setStatus(text: string, kind?: StatusKind): void {
 }
 
 function showStep(num: number): void {
-  $(`step-${num}`).classList.remove('hidden');
+  const el = $(`step-${num}`);
+  const wasHidden = el.classList.contains('hidden');
+  el.classList.remove('hidden');
+  // 새 step이 처음 보일 때만 부드럽게 스크롤 (이미 보이던 step은 noop).
+  // step-1은 부팅 시 보이므로 자동 스크롤 안 함.
+  // setTimeout 150ms — rAF만으로는 streaming append 등으로 layout 재계산 중일 수 있어
+  // settle 후 스크롤. 사용자가 인지할 수 있을 정도의 delay.
+  if (wasHidden && num >= 2) {
+    setTimeout(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
+  }
 }
 
 function formatShortcutForDisplay(sc: string | null): string {
@@ -443,6 +506,71 @@ function closeStats(): void {
   $('stats-modal').classList.add('hidden');
 }
 
+// ─── GitHub backfill — 풀이 레포 root README 인덱스 → localStorage ──
+// 다른 디바이스 / v0.5 이전 풀이까지 통계에 포함되도록.
+// 기존 localStorage entry는 우선 (최신 savedAt 보존). backfill은 빈 자리만 채움.
+async function handleBackfill(): Promise<void> {
+  const btn = $btn('backfill-btn');
+  btn.disabled = true;
+  const originalText = btn.textContent || '↻ GitHub 동기화';
+  btn.textContent = '동기화 중...';
+
+  try {
+    const r = await window.api.backfillFromGithub();
+    if (!r.ok) throw new Error(r.error);
+
+    const indexEntries = r.entries || [];
+    if (indexEntries.length === 0) {
+      setStatus('GitHub 풀이 레포에 인덱스가 없거나 비어있어요', 'error');
+      return;
+    }
+
+    // IndexEntry → SolutionRecord (languages 배열 → 각 lang별 record로 펼침)
+    const backfilled: SolutionRecord[] = [];
+    for (const e of indexEntries) {
+      const ts = new Date(e.savedAt).getTime();
+      const savedAt = isNaN(ts) ? Date.now() : ts;
+      for (const lang of e.languages) {
+        backfilled.push({
+          frontendId: e.frontendId,
+          title: e.title,
+          titleSlug: e.titleSlug,
+          language: lang,
+          difficulty: e.difficulty,
+          savedAt,
+        });
+      }
+    }
+
+    // 기존 localStorage 우선, backfill은 빈 자리만
+    const existing = readSolutions();
+    const map = new Map<string, SolutionRecord>();
+    for (const s of existing) map.set(`${s.titleSlug}:${s.language}`, s);
+    let added = 0;
+    for (const s of backfilled) {
+      const key = `${s.titleSlug}:${s.language}`;
+      if (!map.has(key)) {
+        map.set(key, s);
+        added++;
+      }
+    }
+    const merged = Array.from(map.values()).sort((a, b) => b.savedAt - a.savedAt);
+    localStorage.setItem(SOLUTIONS_KEY, JSON.stringify(merged));
+    renderStatsDashboard();
+
+    if (added > 0) {
+      setStatus(`✓ ${added}개 풀이 새로 동기화 (총 ${merged.length}개)`, 'ok');
+    } else {
+      setStatus('이미 모두 동기화되어 있어요', 'ok');
+    }
+  } catch (e: any) {
+    setStatus(`동기화 실패: ${e?.message || String(e)}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
 // ─── 테마 (dark / light / system) ────────────────────────────
 // Sepia 옵션은 v0.6.0에서 제거됨 — Dark variant라 가치 모호하고 사용자
 // 피드백상 "이상해" 라서 정리. system이 OS 따라 자동 light/dark.
@@ -490,8 +618,10 @@ function applyTheme(t: Theme): void {
   }
 
   // CodeMirror theme — 통과 코드 에디터
+  // 'material'은 이름이 헷갈리지만 실제로 dark theme. light 모드엔 부적합 (punctuation 안 보임).
+  // 'default'는 codemirror.css에 포함된 진짜 light theme.
   if (cmEditor) {
-    cmEditor.setOption('theme', resolved === 'light' ? 'material' : 'material-darker');
+    cmEditor.setOption('theme', resolved === 'light' ? 'default' : 'material-darker');
   }
 
   // 선택된 theme option에 active 표시
@@ -741,6 +871,8 @@ async function handleFetch(): Promise<void> {
     showStep(3);
     updateDuplicateWarning();
     pushRecent(state.problem);
+    // draft 있으면 복원 (작성 중이던 코드 자동 복구)
+    maybeRestoreDraft();
 
     setStatus(`${state.problem.questionFrontendId}. ${state.problem.title} · 준비 완료`, 'ok');
   } catch (e: any) {
@@ -788,10 +920,27 @@ function showUploadSuccess(result: UploadResultShape): void {
     highlightCodeBlocks(stream);
   }
 
+  // commit URL에서 owner/repo 추출 → 폴더 / 인덱스 link 빌드
+  // (commitUrl: https://github.com/{owner}/{repo}/commit/{sha})
+  let folderUrl = '';
+  let indexUrl = '';
+  if (result.commitUrl) {
+    const m = result.commitUrl.match(/github\.com\/([^/]+)\/([^/]+)\/commit\//);
+    if (m) {
+      const [, owner, repo] = m;
+      folderUrl = `https://github.com/${owner}/${repo}/tree/main/${result.folder}`;
+      indexUrl = `https://github.com/${owner}/${repo}`;
+    }
+  }
+
   $('upload-info').innerHTML = `
     <strong>✓ 업로드 완료</strong>
     <div class="result-row"><span class="result-label">폴더</span><code class="inline-mono">${result.folder}</code></div>
     <div class="result-row"><span class="result-label">커밋</span><a href="${result.commitUrl}" target="_blank" rel="noopener">${(result.commitSha || '').slice(0, 7)}</a></div>
+    ${folderUrl ? `<div class="result-links">
+      <a href="${folderUrl}" target="_blank" rel="noopener" class="result-link">📁 풀이 폴더 보기</a>
+      <a href="${indexUrl}" target="_blank" rel="noopener" class="result-link">📚 풀이 인덱스 보기</a>
+    </div>` : ''}
     <div class="action-row">
       <button class="primary" id="next-problem-btn">
         <span class="btn-content">다음 문제 가져오기<kbd class="kbd-inline">⌘K</kbd></span>
@@ -812,7 +961,45 @@ function showUploadSuccess(result: UploadResultShape): void {
     });
   }
 
+  // 업로드 성공 → draft 더 이상 필요 없음
+  clearCurrentDraft();
+
+  // macOS native notification — 사용자가 다른 앱 작업 중일 때 알림
+  notifyUploadComplete();
+
   setStatus('완료 · 다음 문제 가져오기 가능', 'ok');
+}
+
+// ─── macOS / OS native notification ──────────────────────────
+// Notification API는 Electron renderer에서 OS native로 표시.
+// 처음 사용 시 permission 요청. 사용자가 거부하면 silent skip.
+let notificationPermissionRequested = false;
+
+function notifyUploadComplete(): void {
+  if (typeof Notification === 'undefined') return;
+  if (!state.problem || !state.selectedLang) return;
+
+  const send = () => {
+    if (!state.problem) return;
+    try {
+      new Notification('✓ leetbuddy 업로드 완료', {
+        body: `${state.problem.questionFrontendId}. ${state.problem.title} (${state.selectedLang})`,
+        silent: false,
+      });
+    } catch {
+      // notification 생성 실패 (권한 등) — silent
+    }
+  };
+
+  if (Notification.permission === 'granted') {
+    send();
+  } else if (Notification.permission === 'default' && !notificationPermissionRequested) {
+    notificationPermissionRequested = true;
+    Notification.requestPermission().then((perm) => {
+      if (perm === 'granted') send();
+    });
+  }
+  // 'denied'면 아무것도 안 함 (사용자 명시 거부)
 }
 
 function showRepoMissingError(message: string): void {
@@ -988,6 +1175,14 @@ async function openSettings(): Promise<void> {
 
   $('pat-help-panel').classList.add('hidden');
   $('verify-result').classList.add('hidden');
+
+  // OS keychain 사용 가능 여부 확인 → 평문 fallback이면 경고 표시
+  try {
+    const cfg = await window.api.checkConfig();
+    $('keychain-warning').classList.toggle('hidden', cfg.keychain !== false);
+  } catch {
+    /* 확인 실패는 silent */
+  }
 
   // theme picker active 표시 갱신
   const currentTheme = getStoredTheme();
@@ -1235,6 +1430,8 @@ $select('starter-lang-select').addEventListener('change', (e: Event) => {
   updateStarterCode();
   setEditorLang(value);
   updateDuplicateWarning();
+  // 새 lang에 해당하는 draft 있으면 복원 (slug+lang 조합별 별도 draft)
+  maybeRestoreDraft();
 });
 
 $btn('open-leetcode-btn').addEventListener('click', () => window.api.openLeetCode());
@@ -1308,6 +1505,10 @@ $btn('open-stats-btn').addEventListener('click', openStats);
 $btn('close-stats').addEventListener('click', (e: Event) => {
   e.stopPropagation();
   closeStats();
+});
+$btn('backfill-btn').addEventListener('click', (e: Event) => {
+  e.stopPropagation();
+  handleBackfill();
 });
 $('stats-modal').addEventListener('click', (e: Event) => {
   const target = e.target as HTMLElement | null;
