@@ -58,7 +58,7 @@ export async function annotateAndUpload(
   },
   onProgress?: ProgressFn,
   onStream?: StreamCallback
-): Promise<UploadResult & { annotatedHtml: string }> {
+): Promise<UploadResult & { annotatedHtml: string; annotated: string }> {
   // 1) AI 회고 생성 (가장 비싼 단계 - 한 번만 호출)
   onProgress?.('annotating');
   const annotated = await annotateCode(
@@ -82,7 +82,7 @@ export async function annotateAndUpload(
   onProgress?.('uploading');
   try {
     const result = await uploadSolution(uploadArgs);
-    return { ...result, annotatedHtml };
+    return { ...result, annotatedHtml, annotated };
   } catch (err) {
     const status = (err as { status?: number })?.status;
     const autoCreate = process.env.GITHUB_AUTO_CREATE_REPO === 'true';
@@ -95,7 +95,7 @@ export async function annotateAndUpload(
       await new Promise((r) => setTimeout(r, 1500)); // propagation 대기
       onProgress?.('uploading');
       const result = await uploadSolution(uploadArgs);
-      return { ...result, annotatedHtml };
+      return { ...result, annotatedHtml, annotated };
     }
     throw err;
   }

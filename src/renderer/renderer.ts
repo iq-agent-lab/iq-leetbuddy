@@ -163,6 +163,8 @@ interface AppState {
   translation: string;
   selectedLang: string | null;
   lastUploadPayload: UploadPayload | null;
+  /** 마지막 upload 결과의 회고 raw markdown — 사후 편집용 */
+  lastAnnotated: string | null;
 }
 
 const state: AppState = {
@@ -170,7 +172,27 @@ const state: AppState = {
   translation: '',
   selectedLang: null,
   lastUploadPayload: null,
+  lastAnnotated: null,
 };
+
+// ─── settings 토글 (localStorage) ────────────────────────────
+const ACCEPTED_CHECK_KEY = 'iq-leetbuddy:accepted-check';
+
+function getAcceptedCheck(): boolean {
+  try {
+    const v = localStorage.getItem(ACCEPTED_CHECK_KEY);
+    if (v === null) return true; // default ON
+    return v === 'true';
+  } catch {
+    return true;
+  }
+}
+
+function setAcceptedCheck(value: boolean): void {
+  try {
+    localStorage.setItem(ACCEPTED_CHECK_KEY, value ? 'true' : 'false');
+  } catch {}
+}
 
 type StatusKind = 'busy' | 'ok' | 'error' | undefined;
 
@@ -909,6 +931,8 @@ interface UploadResultShape {
   commitSha?: string;
   commitUrl?: string;
   annotatedHtml?: string;
+  /** 회고 raw markdown — 사후 편집 시 textarea 초기값으로 사용 */
+  annotated?: string;
 }
 
 function showUploadSuccess(result: UploadResultShape): void {
@@ -933,6 +957,9 @@ function showUploadSuccess(result: UploadResultShape): void {
     }
   }
 
+  // 회고 raw markdown 보관 — 사후 편집(✏️) 시 textarea 초기값으로 사용
+  state.lastAnnotated = result.annotated || null;
+
   $('upload-info').innerHTML = `
     <strong>✓ 업로드 완료</strong>
     <div class="result-row"><span class="result-label">폴더</span><code class="inline-mono">${result.folder}</code></div>
@@ -945,9 +972,15 @@ function showUploadSuccess(result: UploadResultShape): void {
       <button class="primary" id="next-problem-btn">
         <span class="btn-content">다음 문제 가져오기<kbd class="kbd-inline">⌘K</kbd></span>
       </button>
+      ${state.lastAnnotated ? `<button class="secondary" id="edit-retrospective-btn">
+        <span class="btn-content">✏️ 회고 수정해서 다시 commit</span>
+      </button>` : ''}
     </div>
   `;
   $btn('next-problem-btn').addEventListener('click', reset);
+  if (state.lastAnnotated) {
+    $btn('edit-retrospective-btn').addEventListener('click', startRetrospectiveEdit);
+  }
 
   // 풀이 통계에 기록 — state에 problem/language 보존되어 있음
   if (state.problem && state.selectedLang) {
@@ -1002,6 +1035,104 @@ function notifyUploadComplete(): void {
   // 'denied'면 아무것도 안 함 (사용자 명시 거부)
 }
 
+// ─── 회고 사후 편집 ──────────────────────────────────────────
+// upload 자동 완료 후 사용자가 회고 내용 검토하다 잘못된 부분 발견 시 사용.
+// annotation-stream 영역을 readonly markdown → editable textarea로 전환.
+// "수정 commit" 클릭 → updateRetrospective IPC → RETROSPECTIVE.md만 새 commit.
+function startRetrospectiveEdit(): void {
+  if (!state.problem || !state.selectedLang || !state.lastAnnotated) return;
+
+  const stream = $('annotation-stream') as HTMLElement;
+  stream.classList.add('editing');
+  stream.innerHTML = `
+    <div class="retrospective-edit">
+      <div class="retrospective-edit-header">
+        <span class="retrospective-edit-label">✏️ 회고 수정 (markdown)</span>
+        <span class="retrospective-edit-hint">수정 후 "commit" — RETROSPECTIVE.md만 새 commit (코드/번역 그대로)</span>
+      </div>
+      <textarea id="retrospective-edit-textarea" class="retrospective-edit-textarea" spellcheck="false"></textarea>
+      <div class="action-row">
+        <button class="primary" id="save-retrospective-btn">
+          <span class="btn-content">commit</span>
+        </button>
+        <button class="secondary" id="cancel-retrospective-edit-btn">
+          <span class="btn-content">취소</span>
+        </button>
+      </div>
+    </div>
+  `;
+  const textarea = $('retrospective-edit-textarea') as HTMLTextAreaElement;
+  textarea.value = state.lastAnnotated;
+  textarea.focus();
+  // 끝으로 커서 이동
+  textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+  $btn('save-retrospective-btn').addEventListener('click', saveRetrospective);
+  $btn('cancel-retrospective-edit-btn').addEventListener('click', cancelRetrospectiveEdit);
+}
+
+function cancelRetrospectiveEdit(): void {
+  // 원래 회고 HTML로 복원 — lastAnnotated를 다시 marked로 렌더해야 하지만,
+  // 단순화 위해 페이지 리로드 없이 readonly 표시만. 사용자가 의도적이라 그대로.
+  // 실제 회고 HTML이 필요하면 사용자가 stats나 GitHub에서 확인.
+  const stream = $('annotation-stream') as HTMLElement;
+  stream.classList.remove('editing');
+  // raw markdown을 <pre>로 readonly 표시 (최후 fallback)
+  if (state.lastAnnotated) {
+    stream.innerHTML = `<pre class="retrospective-raw">${escapeHtml(state.lastAnnotated)}</pre>`;
+  }
+  setStatus('회고 수정 취소됨', 'ok');
+}
+
+async function saveRetrospective(): Promise<void> {
+  if (!state.problem || !state.selectedLang) return;
+  const textarea = $('retrospective-edit-textarea') as HTMLTextAreaElement;
+  const edited = textarea.value;
+  if (!edited.trim()) {
+    setStatus('회고 내용이 비어있어요', 'error');
+    return;
+  }
+
+  const saveBtn = $btn('save-retrospective-btn');
+  saveBtn.disabled = true;
+  setButtonLoading('save-retrospective-btn', '회고 commit 중...');
+  setStatus('GitHub에 회고 수정 commit 중...', 'busy');
+
+  try {
+    const r = await window.api.updateRetrospective({
+      problem: state.problem,
+      language: state.selectedLang,
+      annotated: edited,
+    });
+    if (!r.ok) throw new Error(r.error);
+
+    // 새 회고 raw 보관 (이어서 또 수정 가능)
+    state.lastAnnotated = edited;
+
+    // upload-info에 표시되는 commit hash + link 갱신
+    if (r.commitSha && r.commitUrl) {
+      // 기존 upload-info의 commit row만 update하기보단 success 흐름 재진입
+      // 단 annotated만 update — 다른 정보(folder)는 그대로
+      showUploadSuccess({
+        folder: r.folder,
+        commitSha: r.commitSha,
+        commitUrl: r.commitUrl,
+        annotated: edited,
+        annotatedHtml: undefined, // 별도 marked 렌더 안 함 — readonly raw 표시
+      });
+      // annotation-stream은 raw로 readonly 표시 (markdown 형태 보존)
+      const stream = $('annotation-stream') as HTMLElement;
+      stream.classList.remove('editing', 'streaming');
+      stream.innerHTML = `<pre class="retrospective-raw">${escapeHtml(edited)}</pre>`;
+    }
+    setStatus(`✓ 회고 수정 commit 완료 (${(r.commitSha || '').slice(0, 7)})`, 'ok');
+  } catch (e: any) {
+    setStatus(`회고 수정 실패: ${e?.message || String(e)}`, 'error');
+    saveBtn.disabled = false;
+    resetButton('save-retrospective-btn', 'commit');
+  }
+}
+
 function showRepoMissingError(message: string): void {
   // 에러는 result-output 통째로 교체 (회고 partial은 사라지지만 에러가 우선)
   const out = $('result-output');
@@ -1033,6 +1164,35 @@ function showErrorPlain(message: string): void {
 }
 
 async function performUpload(): Promise<void> {
+  // Accepted check (settings에 켜져 있으면, default ON)
+  // 본 도구 핵심 가치: 통과한 풀이 학습 자산화. Accepted 없는 코드 commit 막기.
+  // 단 override 허용 — 다른 OJ / 오프라인 풀이 / API fail 등 예외 케이스 대응.
+  if (getAcceptedCheck() && state.problem) {
+    setStatus('LeetCode에서 Accepted 확인 중...', 'busy');
+    setButtonLoading('upload-btn', 'Accepted 확인 중...');
+    try {
+      const slug = state.problem.titleSlug;
+      const r = await window.api.hasAcceptedSubmission(slug);
+      // accepted === null이면 silent skip (로그인 안 됨 / API fail 등 — false negative 방지)
+      if (r.accepted === false) {
+        const { proceed, dontAskAgain } = await window.api.confirmUploadWithoutAccepted(slug);
+        // "다시 묻지 않음" 체크 시 — proceed/cancel 무관하게 토글 OFF (사용자 명시 선택)
+        if (dontAskAgain) {
+          setAcceptedCheck(false);
+          $input('setting-accepted-check').checked = false;
+        }
+        if (!proceed) {
+          setStatus('업로드 취소됨 — LeetCode에서 먼저 풀이 통과 권장', 'error');
+          resetButton('upload-btn', 'AI 회고 생성 후 GitHub에 업로드');
+          return;
+        }
+        // 사용자가 명시적으로 "그래도 업로드" 선택 → 진행
+      }
+    } catch {
+      // check 자체 실패 — silent skip (정상 흐름 막지 않음)
+    }
+  }
+
   setStatus('AI 회고 작성 중...', 'busy');
   setButtonLoading('upload-btn', 'AI 회고 작성 중...');
 
@@ -1160,6 +1320,7 @@ async function openSettings(): Promise<void> {
   $input('setting-github-repo').value = settings.GITHUB_REPO || '';
   $input('setting-github-branch').value = settings.GITHUB_BRANCH || '';
   $input('setting-auto-create-repo').checked = !!settings.GITHUB_AUTO_CREATE_REPO;
+  $input('setting-accepted-check').checked = getAcceptedCheck();
 
   // 저장 상태 시각적 표시
   setSectionStatus('anthropic-status', settings.hasAnthropicKey);
@@ -1219,6 +1380,8 @@ async function saveSettings(): Promise<void> {
   try {
     const result = await window.api.saveSettings(payload);
     if (!result.ok) throw new Error(result.error);
+    // localStorage 토글도 같이 저장 (.env 아닌 settings)
+    setAcceptedCheck($input('setting-accepted-check').checked);
     setStatus('설정 저장됨', 'ok');
     closeSettings();
     checkConfig();

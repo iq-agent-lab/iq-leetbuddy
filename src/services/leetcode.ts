@@ -181,6 +181,30 @@ async function authedGraphqlRequest(
   return json.data;
 }
 
+// 회고 작성 전 가벼운 확인 — Accepted submission 존재 여부만 (코드는 fetch X).
+// 반환값:
+//   true  — Accepted 1개 이상 있음
+//   false — submission 있지만 Accepted 없음 (또는 submission 0개)
+//   null  — 확인 불가 (로그인 안 됨 / API fail / 세션 만료) → silent skip
+export async function hasAcceptedSubmission(titleSlug: string): Promise<boolean | null> {
+  try {
+    const { cookieHeader, csrf } = await getLeetCodeCookies();
+    if (!cookieHeader || !csrf) return null;
+    const data = await authedGraphqlRequest(
+      { query: SUBMISSION_LIST_QUERY, variables: { offset: 0, limit: 20, questionSlug: titleSlug } },
+      cookieHeader,
+      csrf,
+      titleSlug
+    );
+    const submissions = (data?.questionSubmissionList?.submissions || []) as Array<{
+      statusDisplay: string;
+    }>;
+    return submissions.some((s) => s.statusDisplay === 'Accepted');
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchRecentAcceptedSubmission(
   titleSlug: string
 ): Promise<{ code: string; langSlug: string; langName: string } | null> {

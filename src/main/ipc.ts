@@ -1,11 +1,12 @@
 // Renderer에서 호출하는 IPC 핸들러
 
-import { ipcMain, WebContents } from 'electron';
+import { ipcMain, WebContents, dialog, BrowserWindow } from 'electron';
 import { fetchAndTranslate, annotateAndUpload } from '../services/pipeline';
 import { resetTranslatorClient } from '../services/translator';
 import { resetAnnotatorClient } from '../services/annotator';
-import { resetGithubClient, createRepoIfMissing, verifyConnection, fetchIndexFromGithub } from '../services/github';
-import { fetchRecentAcceptedSubmission } from '../services/leetcode';
+import { resetGithubClient, createRepoIfMissing, verifyConnection, fetchIndexFromGithub, updateRetrospective } from '../services/github';
+import { fetchRecentAcceptedSubmission, hasAcceptedSubmission } from '../services/leetcode';
+import { LeetCodeProblem } from '../types';
 import { renderMarkdown } from '../services/markdown';
 import { getSettingsView, saveSettings, isKeychainAvailable, AppSettings } from './settings';
 
@@ -198,4 +199,55 @@ export function registerIpcHandlers() {
       return { ok: false, error: toErrorMessage(err) };
     }
   });
+
+  // ── 업로드 직전 LeetCode Accepted submission 확인 ──
+  // true = Accepted 있음, false = 없음(submission 0 또는 fail만 있음),
+  // null = 확인 불가 (로그인/네트워크/API fail — silent skip)
+  ipcMain.handle('has-accepted-submission', async (_event, titleSlug: string) => {
+    const accepted = await hasAcceptedSubmission(titleSlug);
+    return { accepted };
+  });
+
+  // ── Accepted 없을 때 사용자에게 native confirm — "그래도 업로드?" ──
+  // dialog.showMessageBox 사용 — Electron native modal (custom HTML 대비 단순/안정).
+  // "다시 묻지 않음" 체크박스 추가 — true면 renderer가 settings 토글 OFF로 전환.
+  ipcMain.handle('confirm-upload-without-accepted', async (event, titleSlug: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return { proceed: false, dontAskAgain: false };
+    const result = await dialog.showMessageBox(win, {
+      type: 'warning',
+      buttons: ['취소', '그래도 업로드'],
+      defaultId: 0,
+      cancelId: 0,
+      title: 'LeetCode Accepted submission이 없어요',
+      message: `이 문제("${titleSlug}")에 Accepted submission이 없어요.`,
+      detail:
+        'iq-leetbuddy는 통과한 풀이를 학습 자산화하는 도구입니다.\n\n' +
+        'LeetCode에서 먼저 풀이를 통과시키는 게 권장 흐름이지만, ' +
+        '본인이 다른 곳에서 풀었거나 의도된 업로드라면 그대로 진행 가능합니다.\n\n' +
+        '풀이 레포 관리는 사용자 자유.',
+      checkboxLabel: '다시 묻지 않음 (설정에서 언제든 다시 켤 수 있음)',
+      checkboxChecked: false,
+    });
+    return {
+      proceed: result.response === 1, // 1 = "그래도 업로드"
+      dontAskAgain: !!result.checkboxChecked,
+    };
+  });
+
+  // ── 회고 사후 편집 — RETROSPECTIVE.md만 새 commit ──
+  ipcMain.handle(
+    'update-retrospective',
+    async (
+      _event,
+      payload: { problem: LeetCodeProblem; language: string; annotated: string }
+    ) => {
+      try {
+        const result = await updateRetrospective(payload);
+        return { ok: true, ...result };
+      } catch (err) {
+        return { ok: false, error: toErrorMessage(err), status: getStatus(err) };
+      }
+    }
+  );
 }

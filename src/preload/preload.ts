@@ -19,6 +19,15 @@ contextBridge.exposeInMainWorld('api', {
   pullLeetCodeUrl: () => ipcRenderer.invoke('pull-leetcode-url'),
   fetchSubmission: (titleSlug: string) =>
     ipcRenderer.invoke('fetch-submission', titleSlug),
+  hasAcceptedSubmission: (titleSlug: string) =>
+    ipcRenderer.invoke('has-accepted-submission', titleSlug),
+  confirmUploadWithoutAccepted: (titleSlug: string) =>
+    ipcRenderer.invoke('confirm-upload-without-accepted', titleSlug),
+  updateRetrospective: (payload: {
+    problem: unknown;
+    language: string;
+    annotated: string;
+  }) => ipcRenderer.invoke('update-retrospective', payload),
   backfillFromGithub: () => ipcRenderer.invoke('backfill-from-github'),
   createRepo: () => ipcRenderer.invoke('create-repo'),
   verifyGithub: () => ipcRenderer.invoke('verify-github'),

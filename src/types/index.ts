@@ -116,6 +116,17 @@ export interface IqApi {
   fetchSubmission: (
     titleSlug: string
   ) => Promise<IpcResult<{ code: string; langSlug: string; langName: string }>>;
+  hasAcceptedSubmission: (
+    titleSlug: string
+  ) => Promise<{ accepted: boolean | null }>;
+  confirmUploadWithoutAccepted: (
+    titleSlug: string
+  ) => Promise<{ proceed: boolean; dontAskAgain: boolean }>;
+  updateRetrospective: (payload: {
+    problem: LeetCodeProblem;
+    language: string;
+    annotated: string;
+  }) => Promise<IpcResult<UploadResult>>;
   backfillFromGithub: () => Promise<
     IpcResult<{
       entries: Array<{
