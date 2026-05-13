@@ -94,6 +94,8 @@ npm run release            # version patch + push + GitHub Actions
 | 자동 update = polling (electron-updater 안 씀) | 유지 | macOS unsigned 앱은 cert 요구로 자동 install fail → polling + footer pill로 알림만. dev 모드는 app.isPackaged로 skip |
 | macOS notification = renderer Notification API | 유지 | Electron renderer에서 new Notification(...)으로 OS native 알림. 첫 사용 시 permission 자동 요청. denied면 silent skip. 사용자 다른 앱 작업 중일 때 가치 |
 | CodeMirror light theme = default (not material) | 유지 | `material` theme이 이름과 달리 dark 배경용 (#263238). light 배경에서 punctuation 옅어 거의 안 보임. `default`는 codemirror.css에 포함된 진짜 light theme (별도 CSS 불필요) |
+| Accepted 사전 확인 = override 허용 (차단 X) | 유지 | 본 도구 핵심 가치는 통과한 풀이 학습 자산화. 단 완전 차단은 다른 OJ/오프라인 풀이/세션 만료 등 예외 케이스 막음 → Electron `dialog.showMessageBox`로 confirm + override 허용. `hasAcceptedSubmission` null(API fail)은 silent skip. 모달 안 "다시 묻지 않음" 체크박스로 토글 OFF 가능 |
+| 회고 사후 편집 = 새 commit (not amend) | 유지 | step-4에 ✏️ 버튼 — annotation-stream을 editable textarea로 전환. "commit" → `updateRetrospective`가 RETROSPECTIVE.md만 새 commit (`fix:` prefix). amend는 force push 필요 + history 재작성이라 risk → 새 commit이 자기 개선 트래킹에도 가치 |
 | 풀이 레포 root README 자동 인덱스 | 유지 | uploadSolution이 매 풀이마다 root README marker 영역만 update. `<!-- iq-leetbuddy:problems:start/end -->` 사이만 touch — 사용자 자유 텍스트(위/아래) 보존. 같은 slug는 languages 합치고 savedAt 갱신. 실패 silent (풀이 commit 우선) |
 | 풀이 통계 localStorage (not SQLite) | 유지 | `better-sqlite3` native module은 electron rebuild 필요 + 플랫폼별 까다로움. localStorage JSON 배열로 단순화 — 오프라인 안전, 디바이스 sync 안 됨. 가치 90% 보존. 📊 모달에서 요약/난이도/언어/월별/최근 표시 |
 | 자동 업데이트 = polling (not electron-updater) | 유지 | electron-updater는 macOS unsigned 앱에서 squirrel.mac cert 요구로 fail. cert 비용 + 복잡도 큼. 대신 GitHub Releases API polling + footer pill로 알림만 — 다운로드는 기존 zip 흐름. dev 모드는 `app.isPackaged`로 skip |

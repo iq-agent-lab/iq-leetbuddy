@@ -1487,6 +1487,76 @@ textarea::-webkit-scrollbar-track {
   opacity: 0.92;
 }
 
+/* 회고 사후 편집 모드 */
+.annotation-stream.editing {
+  background: var(--bg-soft);
+  border: 1px solid rgba(204, 120, 92, 0.3);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.retrospective-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.retrospective-edit-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.retrospective-edit-label {
+  font-size: 12px;
+  color: var(--accent-soft);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.retrospective-edit-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.retrospective-edit-textarea {
+  width: 100%;
+  min-height: 380px;
+  max-height: 60vh;
+  resize: vertical;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text);
+  outline: none;
+  white-space: pre-wrap;
+}
+
+.retrospective-edit-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+/* 편집 취소 / commit 완료 후 회고를 raw markdown으로 readonly 표시 */
+.retrospective-raw {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
 .upload-info {
   padding-top: 14px;
   border-top: 1px solid var(--border);

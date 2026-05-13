@@ -412,6 +412,39 @@ export async function uploadSolution(args: {
   };
 }
 
+// 회고만 수정해서 다시 commit (RETROSPECTIVE.md 한 파일만).
+// 자동 upload 후 사용자가 회고 내용 검토하다 잘못된 부분 발견 시 사용.
+// amend가 아닌 새 commit — history 보존 + force push 불필요.
+export async function updateRetrospective(args: {
+  problem: LeetCodeProblem;
+  language: string;
+  annotated: string;
+}): Promise<UploadResult> {
+  const owner = process.env.GITHUB_OWNER;
+  const repo = process.env.GITHUB_REPO;
+  const branch = process.env.GITHUB_BRANCH || 'main';
+
+  if (!owner || !repo) {
+    throw new Error('GITHUB_OWNER 또는 GITHUB_REPO가 설정되지 않았습니다 — ⚙️ 설정에서 입력해주세요');
+  }
+
+  const num = String(args.problem.questionFrontendId).padStart(4, '0');
+  const baseFolder = `${num}-${args.problem.titleSlug}`;
+  const langDir = langToFolder(args.language);
+  const retroPath = `${baseFolder}/${langDir}/RETROSPECTIVE.md`;
+
+  const files: CommitFile[] = [{ path: retroPath, content: args.annotated }];
+  const message = `fix: ${args.problem.questionFrontendId}. ${args.problem.title} (${langDir}) 회고 수정`;
+
+  const result = await commitFiles(owner, repo, branch, files, message);
+
+  return {
+    folder: `${baseFolder}/${langDir}`,
+    commitSha: result.sha,
+    commitUrl: result.url,
+  };
+}
+
 // 레포 자동 생성: owner가 본인 계정이면 createForAuthenticatedUser,
 // 아니면 조직(org)으로 간주하고 createInOrg
 export async function createRepoIfMissing(): Promise<{
