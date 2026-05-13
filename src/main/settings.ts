@@ -63,6 +63,12 @@ function canEncrypt(): boolean {
   }
 }
 
+// renderer/checkConfig에서 사용 — keychain 사용 가능 여부 노출.
+// false면 시크릿이 평문 저장됨 → settings 모달에 경고 표시.
+export function isKeychainAvailable(): boolean {
+  return canEncrypt();
+}
+
 function maybeEncrypt(key: string, value: string): string {
   if (!SECRET_KEYS.has(key)) return value;
   if (!value) return value;

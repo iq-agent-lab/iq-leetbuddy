@@ -4,10 +4,10 @@ import { ipcMain, WebContents } from 'electron';
 import { fetchAndTranslate, annotateAndUpload } from '../services/pipeline';
 import { resetTranslatorClient } from '../services/translator';
 import { resetAnnotatorClient } from '../services/annotator';
-import { resetGithubClient, createRepoIfMissing, verifyConnection } from '../services/github';
+import { resetGithubClient, createRepoIfMissing, verifyConnection, fetchIndexFromGithub } from '../services/github';
 import { fetchRecentAcceptedSubmission } from '../services/leetcode';
 import { renderMarkdown } from '../services/markdown';
-import { getSettingsView, saveSettings, AppSettings } from './settings';
+import { getSettingsView, saveSettings, isKeychainAvailable, AppSettings } from './settings';
 
 // streaming snapshot을 markdown → HTML로 변환해서 renderer에 push.
 // throttle (120ms) + 순차 처리(renderPromise chain)로 race / 부하 회피.
@@ -124,6 +124,7 @@ export function registerIpcHandlers() {
       owner: process.env.GITHUB_OWNER || '',
       repo: process.env.GITHUB_REPO || '',
       shortcut: shortcutGetter ? shortcutGetter() : null,
+      keychain: isKeychainAvailable(),
     };
   });
 
@@ -181,6 +182,17 @@ export function registerIpcHandlers() {
   ipcMain.handle('fetch-submission', async (_event, titleSlug: string) => {
     try {
       const result = await fetchRecentAcceptedSubmission(titleSlug);
+      return { ok: true, ...result };
+    } catch (err) {
+      return { ok: false, error: toErrorMessage(err) };
+    }
+  });
+
+  // ── GitHub 풀이 레포의 root README 인덱스 backfill ──
+  // 다른 디바이스 / v0.5 이전 풀이를 localStorage stats에 가져오는 용도
+  ipcMain.handle('backfill-from-github', async () => {
+    try {
+      const result = await fetchIndexFromGithub();
       return { ok: true, ...result };
     } catch (err) {
       return { ok: false, error: toErrorMessage(err) };
